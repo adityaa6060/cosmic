@@ -3,309 +3,154 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cosmic AI IDE</title>
-
-  <!-- Clean Typography -->
+  <title>Cosmic AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-
-  <!-- Markdown parser & Syntax highlighter -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-
-  <!-- Stylesheet -->
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <!-- Sidebar: Workspace Files & Recent Chats -->
+  <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <div class="ide-brand">
-        <span class="ide-badge">IDE</span>
-        <span class="ide-title">Cosmic Studio</span>
+      <div class="logo">
+        <img src="logo.png" class="logo-img" alt="Cosmic AI" />
+        <span class="logo-text">Cosmic AI</span>
       </div>
-      <button class="new-chat-btn" id="newChatBtn">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="12" y1="5" x2="12" y2="19"></line>
-          <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-        New Chat
-      </button>
+      <button class="btn btn-primary w-full" id="newChatBtn">+ New Chat</button>
     </div>
 
-    <!-- Workspace Files Section -->
     <div class="sidebar-section">
-      <div class="section-header">
-        <span class="section-title">Workspace Files</span>
-        <button class="add-file-btn" id="addFileBtn" title="Create New File">+</button>
-      </div>
-      <div class="file-list" id="sidebarFileList">
-        <!-- Injected via JavaScript -->
-      </div>
+      <div class="section-title">Workspace Files</div>
+      <div class="file-list" id="sidebarFileList"></div>
     </div>
 
-    <!-- Chat History List -->
-    <nav class="chat-history" id="chatHistory">
-      <p class="history-label">Recent Chats</p>
-    </nav>
+    <div class="sidebar-section scrollable">
+      <div class="section-title">History</div>
+      <div class="history-list" id="chatHistory"></div>
+    </div>
 
-    <!-- Sidebar Footer -->
     <div class="sidebar-footer">
-      <button class="settings-trigger-btn" id="openSettingsBtn">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-        </svg>
-        API Keys & Settings
-      </button>
-
-      <button class="delete-history-btn" id="deleteHistoryBtn">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="3 6 5 6 21 6"></polyline>
-          <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"></path>
-        </svg>
-        Delete All History
-      </button>
-
+      <button class="btn btn-outline w-full" id="deleteHistoryBtn">Clear History</button>
       <div class="user-info">
-        <div class="user-avatar">A</div>
+        <div class="avatar">A</div>
         <span class="user-name">Aditya</span>
       </div>
     </div>
   </aside>
 
-  <!-- Mobile Overlay -->
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-  <!-- Main IDE Wrapper -->
-  <div class="ide-main">
-    <!-- Topbar: Prompt Enhancer replaces previous Cosmic logo -->
+  <!-- Main IDE -->
+  <div class="main-wrapper">
+    <!-- Topbar -->
     <header class="topbar">
       <div class="topbar-left">
-        <button class="hamburger" id="hamburgerBtn" aria-label="Toggle Sidebar">
-          <span></span>
-          <span></span>
-          <span></span>
+        <button class="hamburger" id="hamburgerBtn" aria-label="Toggle Menu">
+          <span></span><span></span><span></span>
         </button>
 
-        <!-- Prompt Enhancer Feature (Placed directly in place of the Cosmic logo) -->
-        <div class="prompt-enhancer-container" id="promptEnhancerContainer">
-          <button class="enhancer-toggle-btn" id="enhancerToggleBtn" title="When ON, Groq AI elevates your prompt to a high-level engineering prompt before sending">
-            <span class="enhancer-icon">✨</span>
-            <span class="enhancer-title">Prompt Enhancer</span>
-            <span class="enhancer-badge off" id="enhancerBadge">OFF</span>
-          </button>
+        <div class="topbar-logo">
+          <img src="logo.png" class="topbar-logo-img" alt="Cosmic AI" />
+          <span class="topbar-title">Cosmic AI</span>
         </div>
+
+        <!-- Prompt Enhancer Toggle -->
+        <button class="enhancer-btn" id="enhancerToggleBtn" title="Toggle Groq Prompt Enhancer">
+          Prompt Enhancer <span class="badge" id="enhancerBadge">OFF</span>
+        </button>
       </div>
 
-      <!-- Center View Switcher for Split / Editor / Chat views -->
       <div class="topbar-center">
-        <div class="view-switcher">
+        <div class="view-switch">
           <button class="view-btn active" id="viewSplitBtn">Split</button>
           <button class="view-btn" id="viewEditorBtn">Editor</button>
-          <button class="view-btn" id="viewChatBtn">AI Agent</button>
+          <button class="view-btn" id="viewChatBtn">Chat</button>
         </div>
       </div>
 
-      <!-- Topbar Actions -->
       <div class="topbar-right">
-        <button class="run-btn" id="runPreviewBtn" title="Run code in live preview">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-          </svg>
-          Run Preview
-        </button>
-
-        <button class="icon-btn" id="clearChatBtn" title="Clear current chat">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6M10 11v6M14 11v6M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"></path>
-          </svg>
-        </button>
+        <button class="btn btn-primary" id="runPreviewBtn">Run Preview</button>
+        <button class="icon-btn" id="clearChatBtn" title="Clear current chat">Clear</button>
       </div>
     </header>
 
-    <!-- Split Workspace: Code Editor on Left, AI Chat on Right -->
+    <!-- Workspace Grid -->
     <div class="workspace-grid" id="workspaceGrid">
       
-      <!-- LEFT PANE: CODE EDITOR & PREVIEW -->
+      <!-- Editor Pane -->
       <section class="editor-pane" id="editorPane">
-        <!-- Editor Tabs -->
         <div class="editor-header">
-          <div class="editor-tabs" id="editorTabs">
-            <!-- Tabs injected dynamically -->
-          </div>
+          <div class="editor-tabs" id="editorTabs"></div>
           <div class="editor-actions">
             <button class="tab-mode-btn active" id="modeCodeBtn">Code</button>
-            <button class="tab-mode-btn" id="modePreviewBtn">Live Preview</button>
-            <button class="editor-action-btn" id="copyEditorCodeBtn" title="Copy active code">Copy</button>
+            <button class="tab-mode-btn" id="modePreviewBtn">Preview</button>
+            <button class="editor-action-btn" id="copyEditorCodeBtn">Copy</button>
           </div>
         </div>
 
-        <!-- Code Editor Body -->
         <div class="editor-body" id="editorCodeView">
           <div class="line-numbers" id="lineNumbers">1</div>
-          <textarea class="code-textarea" id="codeTextarea" spellcheck="false" placeholder="Write code here..."></textarea>
+          <textarea class="code-textarea" id="codeTextarea" spellcheck="false"></textarea>
         </div>
 
-        <!-- Live Preview Iframe Body -->
         <div class="preview-body" id="editorPreviewView" style="display:none">
           <iframe class="preview-iframe" id="previewIframe" sandbox="allow-scripts allow-modals"></iframe>
         </div>
 
-        <!-- Editor Status Footer -->
         <div class="editor-footer">
-          <span class="status-file" id="statusFilename">index.html</span>
-          <span class="status-info" id="statusInfo">Lines: 1 | UTF-8</span>
+          <span id="statusFilename">index.html</span>
+          <span id="statusInfo">Lines: 1 | UTF-8</span>
         </div>
       </section>
 
-      <!-- RIGHT PANE: AI AGENT CHAT -->
+      <!-- Chat Pane -->
       <section class="chat-pane" id="chatPane">
-        
-        <!-- Pinned Messages Panel -->
-        <div class="pinned-panel" id="pinnedPanel" style="display:none">
-          <div class="pinned-header">
-            <div class="pinned-header-left">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
-              </svg>
-              <span>Pinned Messages</span>
-            </div>
-            <span class="pinned-count" id="pinnedCount">0</span>
-          </div>
-          <div class="pinned-list" id="pinnedList"></div>
-        </div>
-
-        <!-- Messages Scroll Container -->
         <div class="messages" id="messages">
           <div class="welcome" id="welcome">
-            <div class="welcome-badge">IDE ASSISTANT</div>
-            <h1 class="welcome-title">Cosmic Studio AI</h1>
-            <p class="welcome-sub">Pair program with Gemini, Groq, or NVIDIA. Write code, debug, and preview in real time.</p>
-
+            <div class="welcome-logo-wrap">
+              <img src="logo.png" class="welcome-logo" alt="Cosmic AI" />
+            </div>
+            <h1 class="welcome-title">Cosmic AI IDE</h1>
+            <p class="welcome-sub">Choose between Groq, Gemini, or NVIDIA. Write, debug, and preview code in real time.</p>
             <div class="suggestions">
-              <button class="suggestion-chip" data-text="Create a minimalist responsive calculator with clean HTML and CSS">Build a calculator</button>
-              <button class="suggestion-chip" data-text="Write a clean JavaScript debounce and throttle implementation with examples">Debounce & Throttle function</button>
-              <button class="suggestion-chip" data-text="Create an animated Pomodoro timer with start, pause, and reset controls">Pomodoro timer app</button>
-              <button class="suggestion-chip" data-text="Explain the difference between flexbox and CSS grid with code examples">Flexbox vs Grid</button>
+              <button class="suggestion-chip" data-text="Build a clean JavaScript countdown timer application">Countdown Timer</button>
+              <button class="suggestion-chip" data-text="Write a minimalist todo list app with local storage">Todo App</button>
+              <button class="suggestion-chip" data-text="Create a responsive CSS flexbox navbar with mobile drawer">Responsive Navbar</button>
+              <button class="suggestion-chip" data-text="Explain the event loop in JavaScript with code examples">JavaScript Event Loop</button>
             </div>
           </div>
         </div>
 
-        <!-- File Previews Before Sending -->
-        <div class="file-preview-area" id="filePreviewArea"></div>
-
-        <!-- Chat Input Footer with 3-Agent Selector -->
+        <!-- Chat Input Footer -->
         <footer class="input-area">
-          <!-- Agent Selector Toolbar right above the prompt -->
           <div class="agent-bar">
-            <div class="agent-select-wrapper">
-              <span class="agent-bar-label">Agent:</span>
+            <div class="agent-select-wrap">
+              <span class="agent-label">Agent:</span>
               <select class="agent-select" id="agentSelect">
-                <option value="groq" selected>⚡ Groq (Llama / OSS 120B)</option>
-                <option value="gemini">♊ Gemini (2.0 Flash)</option>
-                <option value="nvidia">🟢 NVIDIA (Llama 3.3 70B)</option>
+                <option value="groq" selected>Groq (OpenAI-OSS 120B)</option>
+                <option value="gemini">Gemini (2.0 Flash)</option>
+                <option value="nvidia">NVIDIA (Llama 3.2 11B)</option>
               </select>
             </div>
-
-            <!-- Active prompt enhancer status pill -->
-            <div class="enhancer-status-pill" id="enhancerStatusPill">
-              ✨ Enhancer: OFF
-            </div>
+            <span class="enhancer-status" id="enhancerStatus">Enhancer: OFF</span>
           </div>
 
-          <!-- Input Bar -->
           <div class="input-wrapper">
-            <button class="action-btn" id="attachBtn" title="Attach file">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path>
-              </svg>
-            </button>
-            <input type="file" id="fileInput" multiple accept="image/*,.pdf,.txt,.md,.js,.py,.html,.css,.json,.csv" style="display:none" />
-
-            <button class="action-btn" id="imggenBtn" title="Generate image">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                <polyline points="21 15 16 10 5 21"></polyline>
-              </svg>
-            </button>
-
-            <textarea id="messageInput" class="message-input" placeholder="Ask agent to write code, explain, or refactor..." rows="1" maxlength="8000"></textarea>
-
-            <button class="action-btn" id="micBtn" title="Voice input">
-              <svg class="mic-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                <line x1="12" y1="19" x2="12" y2="23"></line>
-                <line x1="8" y1="23" x2="16" y2="23"></line>
-              </svg>
-            </button>
-
-            <button class="send-btn" id="sendBtn" disabled title="Send message">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <line x1="12" y1="19" x2="12" y2="5"></line>
-                <polyline points="5 12 12 5 19 12"></polyline>
-              </svg>
-            </button>
+            <textarea id="messageInput" class="message-input" placeholder="Type a message or instruction..." rows="1" maxlength="8000"></textarea>
+            <button class="send-btn" id="sendBtn" disabled title="Send">Send</button>
           </div>
-          <p class="input-hint" id="inputHint">Press Enter to send. Use 'Apply to Editor' on code blocks to update your files.</p>
+          <p class="input-hint">Press Enter to send. Use 'Apply to Editor' on code blocks to update files.</p>
         </footer>
       </section>
 
     </div>
   </div>
 
-  <!-- API Keys Settings Modal -->
-  <div class="modal-overlay" id="settingsModalOverlay">
-    <div class="modal settings-modal">
-      <h3 class="modal-title">API Keys Configuration</h3>
-      <p class="modal-sub">Configure credentials for the 3 agents. Keys are saved locally in your browser.</p>
-
-      <div class="settings-form">
-        <div class="form-group">
-          <label class="form-label" for="settingGroqKey">Groq API Key (Built-in Default Available)</label>
-          <input type="password" id="settingGroqKey" class="form-input" placeholder="gsk_..." />
-          <span class="form-hint">Used for Groq agent and Groq Prompt Enhancer.</span>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="settingGeminiKey">Google Gemini API Key</label>
-          <input type="password" id="settingGeminiKey" class="form-input" placeholder="AIzaSy..." />
-          <span class="form-hint">Get free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a></span>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="settingNvidiaKey">NVIDIA NIM API Key</label>
-          <input type="password" id="settingNvidiaKey" class="form-input" placeholder="nvapi-..." />
-          <span class="form-hint">Get free key at <a href="https://build.nvidia.com" target="_blank" rel="noopener">build.nvidia.com</a></span>
-        </div>
-      </div>
-
-      <div class="modal-actions">
-        <button class="modal-btn cancel" id="settingsCloseBtn">Cancel</button>
-        <button class="modal-btn confirm" id="settingsSaveBtn">Save Credentials</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Delete History Confirmation Modal -->
-  <div class="modal-overlay" id="modalOverlay">
-    <div class="modal">
-      <h3 class="modal-title">Delete all history?</h3>
-      <p class="modal-sub">This will permanently delete all chat conversations from this browser. This action cannot be undone.</p>
-      <div class="modal-actions">
-        <button class="modal-btn cancel" id="modalCancel">Cancel</button>
-        <button class="modal-btn confirm" id="modalConfirm">Delete</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Foundational JavaScript -->
-  <script src="script.js?v=3"></script>
+  <script src="script.js?v=5"></script>
 </body>
 </html>
