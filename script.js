@@ -1,178 +1,105 @@
-// ============================================================
-// COSMIC AI — MINIMALIST IDE & 3-AGENT SYSTEM
-// Robust Vanilla JavaScript (Groq, Gemini, NVIDIA)
-// ============================================================
+// Cosmic AI — Foundational IDE & Multi-Agent Codespace System
+// API keys are loaded at runtime from .env/keys.json (gitignored) or via Settings modal.
 
-// API Credentials (loaded from .env/keys.json or Settings)
-const DEFAULT_KEYS = {
-  groq: '',
-  gemini: '',
-  nvidia: ''
-};
-
+const DEFAULT_KEYS = { groq: '', gemini: '', nvidia: '' };
 const KEYS = { ...DEFAULT_KEYS };
 
-const SYSTEM_PROMPT = 'You are Cosmic AI, a software engineering assistant in a code IDE. Write clean, direct code with language markdown tags. Explain concisely without conversational filler.';
-
-// State
-let enhancerActive = false;
-let isStreaming = false;
-let activeFile = 'index.html';
-let chatHistoryList = [];
-let currentHistory = [];
-
-const DEFAULT_FILES = {
-  'index.html': `<!DOCTYPE html>
-<html>
-<head>
-  <title>Preview</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <div class="box">
-    <h1>Cosmic AI Studio</h1>
-    <p>Live preview ready. Edit HTML, CSS, or JS and click Run Preview.</p>
-    <button id="testBtn">Test Button</button>
-  </div>
-  <script src="script.js"><\/script>
-</body>
-</html>`,
-  'style.css': `body {
-  font-family: -apple-system, sans-serif;
-  padding: 30px;
-  background: #fafafa;
-  color: #111;
-  display: flex;
-  justify-content: center;
-}
-.box {
-  background: #fff;
-  padding: 24px;
-  border-radius: 8px;
-  border: 1px solid #e0e0e0;
-  text-align: center;
-  max-width: 400px;
-}
-h1 { font-size: 20px; margin-top: 0; }
-button {
-  margin-top: 12px;
-  padding: 8px 16px;
-  background: #111;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}`,
-  'script.js': `document.getElementById('testBtn').addEventListener('click', function() {
-  alert('Live Preview working!');
-});`
+// Agent config: url, key ref, model, max_tokens, type
+const AGENT_CFG = {
+  groq:      { url: 'https://api.groq.com/openai/v1/chat/completions',       key: 'groq',   model: 'openai/gpt-oss-120b',                    tokens: 3500, type: 'openai', name: 'Groq' },
+  'groq-fast':{ url: 'https://api.groq.com/openai/v1/chat/completions',      key: 'groq',   model: 'qwen/qwen3.8-27b',                       tokens: 3000, type: 'openai', name: 'Groq Fast' },
+  nvidia:    { url: 'https://integrate.api.nvidia.com/v1/chat/completions',   key: 'nvidia', model: 'meta/llama-3.2-11b-vision-instruct',     tokens: 2500, type: 'openai', name: 'NVIDIA' },
+  gemini:    { url: null,                                                      key: 'gemini', model: 'gemini-2.5-flash',                      tokens: null, type: 'gemini', name: 'Gemini' }
 };
 
-let files = { ...DEFAULT_FILES };
+let enhancerActive = false, isStreaming = false, activeFile = 'index.html';
+let sessions = [], currentSessionId = null, currentHistory = [];
+let files = { 'index.html': '', 'style.css': '', 'script.js': '' };
 
-// DOM Elements
-const enhancerToggleBtn = document.getElementById('enhancerToggleBtn');
-const enhancerBadge = document.getElementById('enhancerBadge');
-const enhancerStatus = document.getElementById('enhancerStatus');
-const agentSelect = document.getElementById('agentSelect');
-const runPreviewBtn = document.getElementById('runPreviewBtn');
-const clearChatBtn = document.getElementById('clearChatBtn');
-const newChatBtn = document.getElementById('newChatBtn');
-const deleteHistoryBtn = document.getElementById('deleteHistoryBtn');
-const hamburgerBtn = document.getElementById('hamburgerBtn');
-const sidebar = document.getElementById('sidebar');
-const sidebarOverlay = document.getElementById('sidebarOverlay');
-const workspaceGrid = document.getElementById('workspaceGrid');
+const $ = id => document.getElementById(id);
+const enhancerToggleBtn = $('enhancerToggleBtn'), enhancerBadge = $('enhancerBadge'), enhancerStatus = $('enhancerStatus');
+const agentSelect = $('agentSelect'), runPreviewBtn = $('runPreviewBtn'), clearChatBtn = $('clearChatBtn');
+const newChatBtn = $('newChatBtn'), deleteHistoryBtn = $('deleteHistoryBtn'), hamburgerBtn = $('hamburgerBtn');
+const sidebar = $('sidebar'), sidebarOverlay = $('sidebarOverlay'), workspaceGrid = $('workspaceGrid');
+const newFileBtn = $('newFileBtn'), resetFilesBtn = $('resetFilesBtn'), clearEditorCodeBtn = $('clearEditorCodeBtn');
+const openSettingsBtn = $('openSettingsBtn'), sidebarSettingsBtn = $('sidebarSettingsBtn');
+const settingsModalOverlay = $('settingsModalOverlay'), settingsCloseBtn = $('settingsCloseBtn');
+const settingsSaveBtn = $('settingsSaveBtn'), settingsResetBtn = $('settingsResetBtn');
+const settingGroqKey = $('settingGroqKey'), settingGeminiKey = $('settingGeminiKey'), settingNvidiaKey = $('settingNvidiaKey');
+const statusGroqKey = $('statusGroqKey'), statusGeminiKey = $('statusGeminiKey'), statusNvidiaKey = $('statusNvidiaKey');
+const editorTabs = $('editorTabs'), sidebarFileList = $('sidebarFileList'), chatHistory = $('chatHistory');
+const modeCodeBtn = $('modeCodeBtn'), modePreviewBtn = $('modePreviewBtn'), copyEditorCodeBtn = $('copyEditorCodeBtn');
+const editorCodeView = $('editorCodeView'), editorPreviewView = $('editorPreviewView'), previewIframe = $('previewIframe');
+const lineNumbers = $('lineNumbers'), codeTextarea = $('codeTextarea'), statusFilename = $('statusFilename'), statusInfo = $('statusInfo');
+const messagesEl = $('messages'), welcomeEl = $('welcome'), messageInput = $('messageInput'), sendBtn = $('sendBtn');
 
-// Workspace Actions
-const newFileBtn = document.getElementById('newFileBtn');
-const resetFilesBtn = document.getElementById('resetFilesBtn');
-const clearEditorCodeBtn = document.getElementById('clearEditorCodeBtn');
-
-// Settings Elements
-const openSettingsBtn = document.getElementById('openSettingsBtn');
-const sidebarSettingsBtn = document.getElementById('sidebarSettingsBtn');
-const settingsModalOverlay = document.getElementById('settingsModalOverlay');
-const settingsCloseBtn = document.getElementById('settingsCloseBtn');
-const settingsSaveBtn = document.getElementById('settingsSaveBtn');
-const settingsResetBtn = document.getElementById('settingsResetBtn');
-const settingGroqKey = document.getElementById('settingGroqKey');
-const settingGeminiKey = document.getElementById('settingGeminiKey');
-const settingNvidiaKey = document.getElementById('settingNvidiaKey');
-const statusGroqKey = document.getElementById('statusGroqKey');
-const statusGeminiKey = document.getElementById('statusGeminiKey');
-const statusNvidiaKey = document.getElementById('statusNvidiaKey');
-
-// Editor Elements
-const editorTabs = document.getElementById('editorTabs');
-const sidebarFileList = document.getElementById('sidebarFileList');
-const chatHistory = document.getElementById('chatHistory');
-const modeCodeBtn = document.getElementById('modeCodeBtn');
-const modePreviewBtn = document.getElementById('modePreviewBtn');
-const copyEditorCodeBtn = document.getElementById('copyEditorCodeBtn');
-const editorCodeView = document.getElementById('editorCodeView');
-const editorPreviewView = document.getElementById('editorPreviewView');
-const previewIframe = document.getElementById('previewIframe');
-const lineNumbers = document.getElementById('lineNumbers');
-const codeTextarea = document.getElementById('codeTextarea');
-const statusFilename = document.getElementById('statusFilename');
-const statusInfo = document.getElementById('statusInfo');
-
-// Chat Elements
-const messagesEl = document.getElementById('messages');
-const welcomeEl = document.getElementById('welcome');
-const messageInput = document.getElementById('messageInput');
-const sendBtn = document.getElementById('sendBtn');
-
-// Safe Markdown Parsing
 function renderMarkdown(text) {
-  if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
-    try {
-      return marked.parse(text);
-    } catch (_) {
-      return escapeHtml(text);
-    }
-  }
-  return escapeHtml(text);
+  try { return (typeof marked !== 'undefined') ? marked.parse(text) : escapeHtml(text); }
+  catch (_) { return escapeHtml(text); }
 }
 
-// Init Application
+function getSystemPrompt() {
+  const stateParts = Object.keys(files)
+    .filter(f => files[f]?.trim())
+    .map(f => `--- Current ${f} ---\n${files[f]}`);
+  const stateMsg = stateParts.length
+    ? `\n\nCURRENT CODESPACE:\n${stateParts.join('\n\n')}\nBuild upon these existing files.`
+    : `\n\nCURRENT CODESPACE: Empty. Build from scratch.`;
+  return `You are Cosmic AI, an expert foundational web developer inside Cosmic AI Studio.
+Codespace files: index.html, style.css, script.js.
+Rules:
+- Foundational Vanilla HTML5, CSS3, JavaScript only. No frameworks unless asked.
+- Always link <link rel="stylesheet" href="style.css"> and <script src="script.js"></script>.
+- Separate code into \`\`\`html, \`\`\`css, \`\`\`javascript blocks. The IDE auto-writes them to the respective files.
+- Write clean, complete, working code.${stateMsg}`;
+}
+
 async function init() {
+  migrateStorage();
   loadStoredKeys();
   await loadEnvKeys();
-  loadFilesFromStorage();
-  loadHistoryFromStorage();
+  loadSessionsFromStorage();
   setupEvents();
-  renderFileTabs();
-  renderSidebarFiles();
-  openFile(activeFile);
 }
 
-// Credentials Management
+function migrateStorage() {
+  try {
+    if (localStorage.getItem('cosmic_files')?.includes('Cosmic AI Studio'))
+      localStorage.removeItem('cosmic_files');
+    const raw = localStorage.getItem('cosmic_sessions');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        let changed = false;
+        parsed.forEach(s => {
+          if (!s.id) { s.id = 'chat_' + Math.random().toString(36).slice(2, 9); changed = true; }
+          if (!s.files) { s.files = { 'index.html': '', 'style.css': '', 'script.js': '' }; changed = true; }
+          else if (s.files['index.html']?.includes('Cosmic AI Studio')) {
+            s.files = { 'index.html': '', 'style.css': '', 'script.js': '' }; changed = true;
+          }
+        });
+        if (changed) localStorage.setItem('cosmic_sessions', JSON.stringify(parsed));
+      }
+    }
+  } catch (_) {}
+}
+
 function loadStoredKeys() {
   try {
-    const s = localStorage.getItem('cosmic_keys');
-    if (s) {
-      const parsed = JSON.parse(s);
-      if (parsed.groq) KEYS.groq = parsed.groq;
-      if (parsed.gemini) KEYS.gemini = parsed.gemini;
-      if (parsed.nvidia) KEYS.nvidia = parsed.nvidia;
-    }
+    const p = JSON.parse(localStorage.getItem('cosmic_keys') || '{}');
+    ['groq','gemini','nvidia'].forEach(k => { if (p[k]?.trim()) KEYS[k] = p[k].trim(); });
   } catch (_) {}
 }
 
 async function loadEnvKeys() {
   try {
     const res = await fetch('.env/keys.json');
-    if (res.ok) {
-      const data = await res.json();
-      if (!localStorage.getItem('cosmic_keys')) {
-        if (data.GROQ_API_KEY) KEYS.groq = data.GROQ_API_KEY;
-        if (data.GEMINI_API_KEY) KEYS.gemini = data.GEMINI_API_KEY;
-        if (data.NVIDIA_API_KEY) KEYS.nvidia = data.NVIDIA_API_KEY;
-        try { localStorage.setItem('cosmic_keys', JSON.stringify(KEYS)); } catch (_) {}
-      }
-    }
+    if (!res.ok) return;
+    const d = await res.json();
+    if (d.GROQ_API_KEY) KEYS.groq = d.GROQ_API_KEY;
+    if (d.GEMINI_API_KEY) KEYS.gemini = d.GEMINI_API_KEY;
+    if (d.NVIDIA_API_KEY) KEYS.nvidia = d.NVIDIA_API_KEY;
+    try { localStorage.setItem('cosmic_keys', JSON.stringify(KEYS)); } catch (_) {}
   } catch (_) {}
 }
 
@@ -183,33 +110,23 @@ function openSettingsModal() {
   updateKeyStatuses();
   settingsModalOverlay.classList.add('show');
 }
-
-function closeSettingsModal() {
-  settingsModalOverlay.classList.remove('show');
-}
+function closeSettingsModal() { settingsModalOverlay.classList.remove('show'); }
 
 function updateKeyStatuses() {
-  if (statusGroqKey) {
-    statusGroqKey.textContent = settingGroqKey.value.trim() ? 'Configured' : 'Missing';
-    statusGroqKey.className = `form-status ${settingGroqKey.value.trim() ? 'ok' : 'missing'}`;
-  }
-  if (statusGeminiKey) {
-    statusGeminiKey.textContent = settingGeminiKey.value.trim() ? 'Configured' : 'Missing';
-    statusGeminiKey.className = `form-status ${settingGeminiKey.value.trim() ? 'ok' : 'missing'}`;
-  }
-  if (statusNvidiaKey) {
-    statusNvidiaKey.textContent = settingNvidiaKey.value.trim() ? 'Configured' : 'Missing';
-    statusNvidiaKey.className = `form-status ${settingNvidiaKey.value.trim() ? 'ok' : 'missing'}`;
-  }
+  [[settingGroqKey, statusGroqKey], [settingGeminiKey, statusGeminiKey], [settingNvidiaKey, statusNvidiaKey]]
+    .forEach(([inp, el]) => {
+      if (!el) return;
+      const ok = inp.value.trim();
+      el.textContent = ok ? 'Configured' : 'Missing';
+      el.className = `form-status ${ok ? 'ok' : 'missing'}`;
+    });
 }
 
 function saveSettings() {
   KEYS.groq = settingGroqKey.value.trim();
   KEYS.gemini = settingGeminiKey.value.trim();
   KEYS.nvidia = settingNvidiaKey.value.trim();
-  try {
-    localStorage.setItem('cosmic_keys', JSON.stringify(KEYS));
-  } catch (_) {}
+  try { localStorage.setItem('cosmic_keys', JSON.stringify(KEYS)); } catch (_) {}
   closeSettingsModal();
   showToast('API credentials saved');
 }
@@ -222,20 +139,103 @@ function resetSettingsToDefaults() {
   showToast('Default credentials restored in form');
 }
 
-// Workspace File Operations
-function loadFilesFromStorage() {
-  try {
-    const s = localStorage.getItem('cosmic_files');
-    if (s) {
-      const parsed = JSON.parse(s);
-      if (Object.keys(parsed).length > 0) files = parsed;
-    }
-  } catch (_) {}
+// Session Management
+function getCurrentSession() { return sessions.find(s => s.id === currentSessionId) || null; }
+
+function createNewSession(switchToIt = true) {
+  const id = 'chat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  const s = { id, title: 'New Chat', createdAt: Date.now(), updatedAt: Date.now(), history: [], files: { 'index.html': '', 'style.css': '', 'script.js': '' }, activeFile: 'index.html' };
+  sessions.unshift(s);
+  saveAllSessions();
+  if (switchToIt) switchToSession(id);
+  return s;
 }
 
-function saveFilesToStorage() {
-  try { localStorage.setItem('cosmic_files', JSON.stringify(files)); } catch (_) {}
+function switchToSession(id) {
+  if (currentSessionId && currentSessionId !== id) saveCurrentSession();
+  const session = sessions.find(s => s.id === id);
+  if (!session) return;
+  currentSessionId = id;
+  currentHistory = [...(session.history || [])];
+  files = { 'index.html': '', 'style.css': '', 'script.js': '', ...(session.files || {}) };
+  activeFile = (session.activeFile && files[session.activeFile] !== undefined) ? session.activeFile : 'index.html';
+  messagesEl.querySelectorAll('.message-row').forEach(r => r.remove());
+  if (!currentHistory.length) {
+    welcomeEl.classList.remove('hidden');
+  } else {
+    welcomeEl.classList.add('hidden');
+    currentHistory.forEach(m => appendMessage(m.role === 'user' ? 'user' : 'ai', m.content));
+  }
+  openFile(activeFile);
+  updatePreviewIframe();
+  try { localStorage.setItem('cosmic_active_session', id); } catch (_) {}
+  renderHistory();
+  closeSidebar();
 }
+
+function saveCurrentSession() {
+  if (!currentSessionId) return;
+  saveCurrentFileContent();
+  const s = getCurrentSession();
+  if (s) { s.files = { ...files }; s.activeFile = activeFile; s.history = [...currentHistory]; s.updatedAt = Date.now(); saveAllSessions(); }
+}
+
+function saveAllSessions() {
+  try { localStorage.setItem('cosmic_sessions', JSON.stringify(sessions)); if (currentSessionId) localStorage.setItem('cosmic_active_session', currentSessionId); } catch (_) {}
+}
+
+function loadSessionsFromStorage() {
+  try { sessions = JSON.parse(localStorage.getItem('cosmic_sessions') || '[]'); } catch (_) { sessions = []; }
+  if (!sessions.length) createNewSession(false);
+  const saved = localStorage.getItem('cosmic_active_session');
+  switchToSession((sessions.find(s => s.id === saved) || sessions[0]).id);
+}
+
+function deleteSession(id) {
+  if (!confirm('Delete this chat and its codespace?')) return;
+  const idx = sessions.findIndex(s => s.id === id);
+  if (idx === -1) return;
+  sessions.splice(idx, 1);
+  if (currentSessionId === id) sessions.length ? switchToSession(sessions[0].id) : createNewSession(true);
+  else { saveAllSessions(); renderHistory(); }
+  showToast('Chat and codespace deleted');
+}
+
+function renderHistory() {
+  chatHistory.innerHTML = '';
+  sessions.forEach(s => {
+    const item = document.createElement('div');
+    item.className = `history-item${s.id === currentSessionId ? ' active' : ''}`;
+    const span = document.createElement('span');
+    span.textContent = s.title || 'New Chat';
+    item.appendChild(span);
+    const del = document.createElement('button');
+    del.className = 'history-item-del'; del.innerHTML = '&times;'; del.title = 'Delete';
+    del.onclick = e => { e.stopPropagation(); deleteSession(s.id); };
+    item.appendChild(del);
+    item.onclick = () => { if (s.id !== currentSessionId) switchToSession(s.id); closeSidebar(); };
+    chatHistory.appendChild(item);
+  });
+}
+
+function startNewChat() {
+  saveCurrentSession(); createNewSession(true);
+  messageInput.value = ''; messageInput.style.height = 'auto'; updateSendBtn();
+  showToast('New chat & clean codespace ready');
+}
+
+function clearChat() {
+  currentHistory = [];
+  const s = getCurrentSession();
+  if (s) { s.history = []; saveAllSessions(); }
+  messagesEl.querySelectorAll('.message-row').forEach(r => r.remove());
+  welcomeEl.classList.remove('hidden');
+  messageInput.value = ''; messageInput.style.height = 'auto'; updateSendBtn();
+  showToast('Chat cleared');
+}
+
+// File Operations
+const CORE_FILES = ['index.html', 'style.css', 'script.js'];
 
 function renderFileTabs() {
   editorTabs.innerHTML = '';
@@ -250,118 +250,93 @@ function renderFileTabs() {
 
 function renderSidebarFiles() {
   sidebarFileList.innerHTML = '';
-  const fileNames = Object.keys(files);
-  fileNames.forEach(name => {
+  Object.keys(files).forEach(name => {
     const item = document.createElement('div');
     item.className = `file-item${name === activeFile ? ' active' : ''}`;
-    
     const label = document.createElement('span');
     label.textContent = name;
     item.appendChild(label);
-
-    // Delete button for custom files (or if there are multiple files)
-    if (fileNames.length > 1 && !['index.html', 'style.css', 'script.js'].includes(name)) {
-      const delBtn = document.createElement('button');
-      delBtn.className = 'file-item-del';
-      delBtn.innerHTML = '&times;';
-      delBtn.title = `Delete ${name}`;
-      delBtn.onclick = (e) => {
-        e.stopPropagation();
-        deleteFile(name);
-      };
-      item.appendChild(delBtn);
+    if (!CORE_FILES.includes(name)) {
+      const del = document.createElement('button');
+      del.className = 'file-item-del'; del.innerHTML = '&times;'; del.title = `Delete ${name}`;
+      del.onclick = e => { e.stopPropagation(); deleteFile(name); };
+      item.appendChild(del);
     }
-
-    item.onclick = () => {
-      saveCurrentFileContent();
-      openFile(name);
-      setView('split');
-      closeSidebar();
-    };
+    item.onclick = () => { saveCurrentFileContent(); openFile(name); setView('split'); closeSidebar(); };
     sidebarFileList.appendChild(item);
   });
 }
 
+const PLACEHOLDERS = { 'index.html': '<!-- HTML code will be written here by AI -->', 'style.css': '/* CSS styles will be written here by AI */', 'script.js': '// JavaScript logic will be written here by AI' };
+
 function openFile(name) {
-  if (!files[name] && files[name] !== '') {
-    name = Object.keys(files)[0] || 'index.html';
-  }
+  if (files[name] === undefined) name = Object.keys(files)[0] || 'index.html';
   activeFile = name;
+  const s = getCurrentSession();
+  if (s) s.activeFile = name;
   codeTextarea.value = files[name] || '';
+  codeTextarea.placeholder = PLACEHOLDERS[name] || `// Code for ${name}...`;
   statusFilename.textContent = name;
-  updateLines();
-  renderFileTabs();
-  renderSidebarFiles();
+  updateLines(); renderFileTabs(); renderSidebarFiles();
 }
 
 function saveCurrentFileContent() {
-  if (activeFile && files[activeFile] !== undefined) {
-    files[activeFile] = codeTextarea.value;
-    saveFilesToStorage();
-  }
+  if (!activeFile || files[activeFile] === undefined) return;
+  files[activeFile] = codeTextarea.value;
+  const s = getCurrentSession();
+  if (s) { if (!s.files) s.files = {}; s.files[activeFile] = codeTextarea.value; saveAllSessions(); }
 }
 
 function updateLines() {
-  const count = codeTextarea.value.split('\n').length;
-  lineNumbers.textContent = Array.from({ length: Math.max(count, 1) }, (_, i) => i + 1).join('\n');
+  const count = (codeTextarea.value || '').split('\n').length;
+  lineNumbers.textContent = Array.from({ length: count }, (_, i) => i + 1).join('\n');
   statusInfo.textContent = `Lines: ${count} | UTF-8`;
 }
 
 function createNewFile() {
-  const rawName = prompt('Enter new file name (e.g., utils.js, component.html):');
-  if (!rawName) return;
-  const fileName = rawName.trim();
-  if (!fileName) return;
-
-  if (files[fileName] !== undefined) {
-    saveCurrentFileContent();
-    openFile(fileName);
-    showToast(`Switched to existing file: ${fileName}`);
-    return;
-  }
-
+  const name = prompt('Enter new file name (e.g., utils.js):')?.trim();
+  if (!name) return;
   saveCurrentFileContent();
-  files[fileName] = '';
-  saveFilesToStorage();
-  openFile(fileName);
-  showToast(`Created ${fileName}`);
+  if (files[name] !== undefined) { openFile(name); showToast(`Switched to: ${name}`); return; }
+  files[name] = '';
+  const s = getCurrentSession();
+  if (s) { if (!s.files) s.files = {}; s.files[name] = ''; saveAllSessions(); }
+  openFile(name); showToast(`Created ${name}`);
 }
 
 function deleteFile(name) {
+  if (CORE_FILES.includes(name)) { showToast('Cannot delete foundational files'); return; }
   if (!confirm(`Delete ${name}?`)) return;
   delete files[name];
-  saveFilesToStorage();
-  if (activeFile === name) {
-    activeFile = Object.keys(files)[0] || 'index.html';
-  }
-  openFile(activeFile);
-  showToast(`Deleted ${name}`);
+  const s = getCurrentSession();
+  if (s?.files) { delete s.files[name]; saveAllSessions(); }
+  if (activeFile === name) activeFile = 'index.html';
+  openFile(activeFile); showToast(`Deleted ${name}`);
 }
 
 function resetWorkspaceFiles() {
-  if (!confirm('Reset all files (index.html, style.css, script.js) to clean starter templates?')) return;
-  files = { ...DEFAULT_FILES };
-  saveFilesToStorage();
-  openFile('index.html');
-  showToast('Workspace reset to starter project');
+  if (!confirm("Clear this codespace's files?")) return;
+  CORE_FILES.forEach(f => files[f] = '');
+  const s = getCurrentSession();
+  if (s) { s.files = { 'index.html': '', 'style.css': '', 'script.js': '' }; saveAllSessions(); }
+  openFile('index.html'); updatePreviewIframe(); showToast('Codespace cleared');
 }
 
 function clearEditorCode() {
-  if (!confirm(`Clear all code in ${activeFile}?`)) return;
-  codeTextarea.value = '';
-  saveCurrentFileContent();
-  updateLines();
-  showToast(`Cleared ${activeFile}`);
+  if (!confirm(`Clear ${activeFile}?`)) return;
+  codeTextarea.value = ''; saveCurrentFileContent(); updateLines(); updatePreviewIframe(); showToast(`Cleared ${activeFile}`);
+}
+
+// Preview
+function updatePreviewIframe() {
+  const html = (files['index.html'] || '')
+    .replace(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi, '')
+    .replace(/<script\s+src=["'][^"']*["'][^>]*><\/script>/gi, '');
+  previewIframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${files['style.css'] || ''}</style></head><body>${html}<script>${files['script.js'] || ''}<\/script></body></html>`;
 }
 
 function runPreview() {
-  saveCurrentFileContent();
-  const htmlContent = (files['index.html'] || '')
-    .replace(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi, '')
-    .replace(/<script\s+src=["'][^"']*["'][^>]*><\/script>/gi, '');
-  const bundle = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${files['style.css'] || ''}</style></head><body>${htmlContent}<script>${files['script.js'] || ''}<\/script></body></html>`;
-  previewIframe.srcdoc = bundle;
-  setMode('preview');
+  saveCurrentFileContent(); updatePreviewIframe(); setMode('preview');
   if (workspaceGrid.classList.contains('mode-chat')) setView('split');
   showToast('Live preview updated');
 }
@@ -374,13 +349,46 @@ function setMode(mode) {
 }
 
 function setView(view) {
-  const splitBtn = document.getElementById('viewSplitBtn');
-  const chatBtn = document.getElementById('viewChatBtn');
-  if (splitBtn) splitBtn.classList.toggle('active', view === 'split');
-  if (chatBtn) chatBtn.classList.toggle('active', view === 'chat');
-
+  $('viewSplitBtn')?.classList.toggle('active', view === 'split');
+  $('viewChatBtn')?.classList.toggle('active', view === 'chat');
   workspaceGrid.classList.remove('mode-editor', 'mode-chat');
   if (view === 'chat') workspaceGrid.classList.add('mode-chat');
+}
+
+// Code Extraction
+function extractCodeBlocks(text) {
+  const blocks = {};
+  if (!text) return blocks;
+  const re = /```([a-zA-Z0-9_\-.: ]*)\n([\s\S]*?)(?:```|$)/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const h = (m[1] || '').trim().toLowerCase();
+    const code = m[2]?.trim();
+    if (!code) continue;
+    let t = h.includes('html') || h.includes('htm') ? 'index.html'
+           : h.includes('css') ? 'style.css'
+           : (h.includes('javascript') || h.includes('js')) ? 'script.js'
+           : null;
+    if (!t) {
+      const fl = code.split('\n')[0].trim().toLowerCase();
+      t = fl.includes('index.html') ? 'index.html' : fl.includes('style.css') ? 'style.css' : fl.includes('script.js') ? 'script.js' : null;
+    }
+    if (!t && (code.startsWith('<!doctype html') || code.startsWith('<html') || (code.includes('<body') && code.includes('</body>')))) t = 'index.html';
+    if (t) blocks[t] = code;
+  }
+  return blocks;
+}
+
+function autoApplyCode(blocks, silent = false) {
+  const updated = Object.keys(blocks);
+  if (!updated.length) return false;
+  const s = getCurrentSession();
+  updated.forEach(f => { files[f] = blocks[f]; if (s) { if (!s.files) s.files = {}; s.files[f] = blocks[f]; } });
+  saveAllSessions();
+  if (blocks[activeFile] !== undefined) { codeTextarea.value = files[activeFile]; updateLines(); }
+  renderFileTabs(); renderSidebarFiles(); updatePreviewIframe();
+  if (!silent) showToast(`⚡ Auto-written to ${updated.join(', ')}`);
+  return true;
 }
 
 // Prompt Enhancer
@@ -398,308 +406,131 @@ async function enhancePrompt(promptText) {
   try {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${KEYS.groq}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'qwen/qwen3.8-27b',
-        temperature: 0.5,
-        max_tokens: 500,
-        messages: [
-          { role: 'system', content: 'You are an expert prompt engineer. Expand the user prompt into a concise, high-level technical engineering specification for an AI developer. Return ONLY the enhanced prompt.' },
-          { role: 'user', content: promptText }
-        ]
-      })
+      headers: { Authorization: `Bearer ${KEYS.groq}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'qwen/qwen3.8-27b', temperature: 0.5, max_tokens: 500, messages: [
+        { role: 'system', content: 'Expert prompt engineer. Expand the user prompt into a concise technical spec for a foundational vanilla web app. Return ONLY the enhanced prompt.' },
+        { role: 'user', content: promptText }
+      ]})
     });
     if (!res.ok) return promptText;
-    const d = await res.json();
-    return d.choices?.[0]?.message?.content?.trim() || promptText;
-  } catch (_) {
-    return promptText;
-  }
+    return (await res.json()).choices?.[0]?.message?.content?.trim() || promptText;
+  } catch (_) { return promptText; }
 }
 
-// Agent Calls
-function getAgentName(agent) {
-  if (agent === 'gemini') return 'Gemini';
-  if (agent === 'groq-fast') return 'Groq Fast';
-  if (agent === 'nvidia') return 'NVIDIA';
-  return 'Groq';
-}
-
+// Unified Agent Call (data-driven)
 async function callAgent(agent, history, onChunk, onReasoning) {
-  if (agent === 'gemini') {
-    // Google Gemini 2.5 Flash
-    if (!KEYS.gemini) {
-      openSettingsModal();
-      throw new Error('Gemini API Key missing. Please configure it in Settings.');
-    }
-    const contents = history.map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }]
-    }));
+  const cfg = AGENT_CFG[agent] || AGENT_CFG.groq;
+  const sysPrompt = getSystemPrompt();
+  const apiKey = KEYS[cfg.key];
+  if (!apiKey) throw new Error(`${cfg.name} API Key missing. Configure it in Settings.`);
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${KEYS.gemini}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents,
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }
-      })
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      let msg = `Gemini error (${res.status})`;
-      try {
-        const j = JSON.parse(errText);
-        if (j.error?.message) msg = j.error.message;
-      } catch (_) {}
-      throw new Error(msg);
-    }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let full = '';
+  if (cfg.type === 'gemini') {
+    const contents = history.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model}:streamGenerateContent?alt=sse&key=${apiKey}`;
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents, systemInstruction: { parts: [{ text: sysPrompt }] } }) });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error?.message || `Gemini error (${res.status})`); }
+    const reader = res.body.getReader(); const dec = new TextDecoder(); let full = '';
     while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      for (const line of decoder.decode(value).split('\n')) {
+      const { done, value } = await reader.read(); if (done) break;
+      for (const line of dec.decode(value).split('\n')) {
         if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-        if (!data) continue;
-        try {
-          const parsed = JSON.parse(data);
-          const parts = parsed.candidates?.[0]?.content?.parts || [];
-          for (const p of parts) {
-            if (p.text) {
-              full += p.text;
-              onChunk(full);
-            }
-          }
-        } catch (_) {}
+        try { JSON.parse(line.slice(6)).candidates?.[0]?.content?.parts?.forEach(p => { if (p.text) { full += p.text; onChunk(full); } }); } catch (_) {}
       }
     }
     return full;
-
-  } else if (agent === 'nvidia') {
-    // NVIDIA NIM (Meta Llama 3.2 11B Vision Instruct)
-    if (!KEYS.nvidia) {
-      openSettingsModal();
-      throw new Error('NVIDIA API Key missing. Please configure it in Settings.');
-    }
-    const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${KEYS.nvidia}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'meta/llama-3.2-11b-vision-instruct',
-        stream: true,
-        max_tokens: 1500,
-        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history]
-      })
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      let msg = `NVIDIA error (${res.status})`;
-      try {
-        const j = JSON.parse(errText);
-        if (j.detail) msg = j.detail;
-        else if (j.title) msg = j.title;
-      } catch (_) {}
-      throw new Error(msg);
-    }
-    return await streamOpenAIResponse(res, onChunk, onReasoning);
-
-  } else if (agent === 'groq-fast') {
-    // Groq Cloud (Qwen 2.5 27B - Instant code responses)
-    if (!KEYS.groq) {
-      openSettingsModal();
-      throw new Error('Groq API Key missing. Please configure it in Settings.');
-    }
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${KEYS.groq}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'qwen/qwen3.8-27b',
-        stream: true,
-        max_tokens: 2000,
-        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history]
-      })
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      let msg = `Groq error (${res.status})`;
-      try {
-        const j = JSON.parse(errText);
-        if (j.error?.message) msg = j.error.message;
-      } catch (_) {}
-      throw new Error(msg);
-    }
-    return await streamOpenAIResponse(res, onChunk, onReasoning);
-
-  } else {
-    // Groq Cloud (OpenAI OSS 120B with Deep Reasoning)
-    if (!KEYS.groq) {
-      openSettingsModal();
-      throw new Error('Groq API Key missing. Please configure it in Settings.');
-    }
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${KEYS.groq}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'openai/gpt-oss-120b',
-        stream: true,
-        max_tokens: 2500,
-        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history]
-      })
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      let msg = `Groq error (${res.status})`;
-      try {
-        const j = JSON.parse(errText);
-        if (j.error?.message) msg = j.error.message;
-      } catch (_) {}
-      throw new Error(msg);
-    }
-    return await streamOpenAIResponse(res, onChunk, onReasoning);
   }
+
+  // OpenAI-compatible (Groq / NVIDIA)
+  const res = await fetch(cfg.url, { method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: cfg.model, stream: true, max_tokens: cfg.tokens, messages: [{ role: 'system', content: sysPrompt }, ...history] })
+  });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    throw new Error(j.error?.message || j.detail || j.title || `${cfg.name} error (${res.status})`);
+  }
+  return await streamOpenAI(res, onChunk, onReasoning);
 }
 
-async function streamOpenAIResponse(res, onChunk, onReasoning) {
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let full = '';
-  let reasoning = '';
+async function streamOpenAI(res, onChunk, onReasoning) {
+  const reader = res.body.getReader(); const dec = new TextDecoder(); let full = '', reasoning = '';
   while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    for (const line of decoder.decode(value).split('\n')) {
+    const { done, value } = await reader.read(); if (done) break;
+    for (const line of dec.decode(value).split('\n')) {
       if (!line.startsWith('data: ')) continue;
-      const data = line.slice(6).trim();
-      if (data === '[DONE]' || !data) continue;
+      const d = line.slice(6).trim();
+      if (d === '[DONE]' || !d) continue;
       try {
-        const parsed = JSON.parse(data);
-        const delta = parsed.choices?.[0]?.delta;
+        const delta = JSON.parse(d).choices?.[0]?.delta;
         if (!delta) continue;
-        if (delta.reasoning && onReasoning) {
-          reasoning += delta.reasoning;
-          onReasoning(reasoning);
-        }
-        if (delta.content) {
-          full += delta.content;
-          onChunk(full);
-        }
+        if (delta.reasoning && onReasoning) { reasoning += delta.reasoning; onReasoning(reasoning); }
+        if (delta.content) { full += delta.content; onChunk(full); }
       } catch (_) {}
     }
   }
   return full;
 }
 
-// Chat Sending
+// Chat
 async function sendMessage() {
   const raw = messageInput.value.trim();
   if (!raw || isStreaming) return;
-
   welcomeEl.classList.add('hidden');
-  messageInput.value = '';
-  messageInput.style.height = 'auto';
-  updateSendBtn();
-
+  messageInput.value = ''; messageInput.style.height = 'auto'; updateSendBtn();
   appendMessage('user', raw);
+  const s = getCurrentSession();
+  if (s && (!s.title || s.title === 'New Chat')) { s.title = raw.slice(0, 30) + (raw.length > 30 ? '...' : ''); renderHistory(); }
 
-  let promptToSend = raw;
-  let enhancedPrefix = '';
-
+  let promptToSend = raw, enhancedPrefix = '';
   if (enhancerActive) {
-    const typing = appendTyping('Enhancing prompt with Groq...');
-    try {
-      const enhanced = await enhancePrompt(raw);
-      promptToSend = enhanced;
-      enhancedPrefix = `> [Enhanced Prompt Used - Groq]\n> ${enhanced.replace(/\n/g, '\n> ')}\n\n---\n\n`;
-    } catch (_) {}
-    typing.remove();
+    const t = appendTyping('Enhancing prompt...');
+    try { const e = await enhancePrompt(raw); promptToSend = e; enhancedPrefix = `> [Enhanced]\n> ${e.replace(/\n/g, '\n> ')}\n\n---\n\n`; } catch (_) {}
+    t.remove();
   }
 
   currentHistory.push({ role: 'user', content: promptToSend });
   const agent = agentSelect.value;
-  const typing = appendTyping(`${getAgentName(agent)} is writing...`);
+  const typingEl = appendTyping(`${AGENT_CFG[agent]?.name || 'AI'} is writing...`);
   isStreaming = true;
-
   try {
-    const aiRow = createAiRow(agent);
-    const bubble = aiRow.querySelector('.bubble');
-    typing.remove();
-
-    let fullRes = '';
-    let reasoningText = '';
-
-    await callAgent(
-      agent,
-      currentHistory,
-      (chunk) => {
-        fullRes = chunk;
-        renderAiBubble(bubble, enhancedPrefix + fullRes, reasoningText);
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-      },
-      (rChunk) => {
-        reasoningText = rChunk;
-        renderAiBubble(bubble, enhancedPrefix + fullRes, reasoningText);
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-      }
+    const aiRow = createAiRow(agent); const bubble = aiRow.querySelector('.bubble'); typingEl.remove();
+    let fullRes = '', reasoningText = '';
+    await callAgent(agent, currentHistory,
+      chunk => { fullRes = chunk; renderAiBubble(bubble, enhancedPrefix + fullRes, reasoningText); messagesEl.scrollTop = messagesEl.scrollHeight; autoApplyCode(extractCodeBlocks(fullRes), true); },
+      rChunk => { reasoningText = rChunk; renderAiBubble(bubble, enhancedPrefix + fullRes, reasoningText); messagesEl.scrollTop = messagesEl.scrollHeight; }
     );
-
     currentHistory.push({ role: 'assistant', content: fullRes });
-    saveSession();
+    autoApplyCode(extractCodeBlocks(fullRes), false);
+    saveCurrentSession();
   } catch (err) {
-    typing.remove();
-    appendMessage('ai', `**Agent Error (${getAgentName(agent)}):** ${err.message}\n\n*Check your API credentials in Settings if needed.*`);
+    typingEl.remove();
+    appendMessage('ai', `**Agent Error (${AGENT_CFG[agent]?.name || agent}):** ${err.message}`);
   }
-
-  isStreaming = false;
-  updateSendBtn();
+  isStreaming = false; updateSendBtn();
 }
 
-function renderAiBubble(bubble, markdownText, reasoningText) {
+function renderAiBubble(bubble, md, reasoning) {
   let html = '';
-  if (reasoningText) {
-    html += `<div class="thinking-box">
-      <div class="thinking-header" onclick="this.nextElementSibling.classList.toggle('hidden')">
-        <span>Thinking (${reasoningText.length} chars)</span>
-        <span style="font-size:10px;">toggle</span>
-      </div>
-      <div class="thinking-content">${escapeHtml(reasoningText)}</div>
-    </div>`;
-  }
-  html += renderMarkdown(markdownText);
-  bubble.innerHTML = html;
+  if (reasoning) html = `<div class="thinking-box"><div class="thinking-header" onclick="this.nextElementSibling.classList.toggle('hidden')"><span>Thinking (${reasoning.length} chars)</span><span style="font-size:10px">toggle</span></div><div class="thinking-content">${escapeHtml(reasoning)}</div></div>`;
+  bubble.innerHTML = html + renderMarkdown(md);
   setupCodeBlocks(bubble);
 }
 
-// Message Rendering
 function appendMessage(role, text) {
   const row = document.createElement('div');
   row.className = `message-row ${role}`;
-  row.innerHTML = `
-    ${role === 'ai' ? '<div class="msg-avatar">AI</div>' : ''}
-    <div class="msg-content"><div class="bubble">${renderMarkdown(text)}</div></div>`;
-  setupCodeBlocks(row);
-  messagesEl.appendChild(row);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  row.innerHTML = `${role === 'ai' ? '<div class="msg-avatar">AI</div>' : ''}<div class="msg-content"><div class="bubble">${renderMarkdown(text)}</div></div>`;
+  setupCodeBlocks(row); messagesEl.appendChild(row); messagesEl.scrollTop = messagesEl.scrollHeight;
   return row;
 }
 
 function createAiRow(agent) {
   const row = document.createElement('div');
   row.className = 'message-row ai';
-  const initial = agent === 'gemini' ? 'G' : (agent === 'nvidia' ? 'N' : 'Q');
-  row.innerHTML = `
-    <div class="msg-avatar">${initial}</div>
-    <div class="msg-content"><div class="bubble"></div></div>`;
-  messagesEl.appendChild(row);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  const initial = { gemini: 'G', nvidia: 'N' }[agent] || 'Q';
+  row.innerHTML = `<div class="msg-avatar">${initial}</div><div class="msg-content"><div class="bubble"></div></div>`;
+  messagesEl.appendChild(row); messagesEl.scrollTop = messagesEl.scrollHeight;
   return row;
 }
 
@@ -707,8 +538,7 @@ function appendTyping(msg) {
   const row = document.createElement('div');
   row.className = 'message-row ai';
   row.innerHTML = `<div class="msg-avatar">..</div><div class="msg-content"><div class="typing-box"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div><span>${msg}</span></div></div>`;
-  messagesEl.appendChild(row);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  messagesEl.appendChild(row); messagesEl.scrollTop = messagesEl.scrollHeight;
   return row;
 }
 
@@ -716,230 +546,86 @@ function setupCodeBlocks(container) {
   container.querySelectorAll('pre').forEach(pre => {
     if (pre.dataset.bound) return;
     pre.dataset.bound = 'true';
-
     const code = pre.querySelector('code');
     if (!code) return;
     if (typeof hljs !== 'undefined') hljs.highlightElement(code);
-
     const lang = Array.from(code.classList).find(c => c.startsWith('language-'))?.replace('language-', '') || 'code';
-
+    const target = lang.includes('html') ? 'index.html' : lang.includes('css') ? 'style.css' : (lang.includes('js') ? 'script.js' : null);
     const box = document.createElement('div');
     box.className = 'code-box';
-    box.innerHTML = `
-      <div class="code-box-header">
-        <span>${lang.toUpperCase()}</span>
-        <div class="code-box-btns">
-          <button class="code-btn apply-btn">Apply to Editor</button>
-          <button class="code-btn copy-btn">Copy</button>
-        </div>
-      </div>`;
-
-    box.querySelector('.copy-btn').onclick = (e) => copyText(code.innerText, e.currentTarget);
+    box.innerHTML = `<div class="code-box-header"><div class="code-box-title"><span>${lang.toUpperCase()}</span>${target ? `<span class="code-auto-tag">✓ Auto-written to ${target}</span>` : ''}</div><div class="code-box-btns"><button class="code-btn apply-btn">${target ? `Re-apply to ${target}` : 'Apply to Editor'}</button><button class="code-btn copy-btn">Copy</button></div></div>`;
+    box.querySelector('.copy-btn').onclick = e => copyText(code.innerText, e.currentTarget);
     box.querySelector('.apply-btn').onclick = () => {
-      let target = activeFile;
-      if (lang.includes('html')) target = 'index.html';
-      else if (lang.includes('css')) target = 'style.css';
-      else if (lang.includes('js')) target = 'script.js';
-      
-      files[target] = code.innerText;
-      saveFilesToStorage();
-      openFile(target);
-      setView('split');
-      setMode('code');
-      showToast(`Applied code to ${target}`);
+      const dest = target || activeFile;
+      files[dest] = code.innerText;
+      const s = getCurrentSession(); if (s) { if (!s.files) s.files = {}; s.files[dest] = code.innerText; }
+      saveAllSessions(); openFile(dest); setView('split'); setMode('code'); updatePreviewIframe(); showToast(`Applied to ${dest}`);
     };
-
-    pre.parentNode.insertBefore(box, pre);
-    box.appendChild(pre);
+    pre.parentNode.insertBefore(box, pre); box.appendChild(pre);
   });
 }
 
-// Sessions & History
-function saveSession() {
-  if (!currentHistory.length) return;
-  const title = currentHistory[0].content.slice(0, 28) + (currentHistory[0].content.length > 28 ? '...' : '');
-  chatHistoryList.unshift({ title, history: [...currentHistory] });
-  try { localStorage.setItem('cosmic_sessions', JSON.stringify(chatHistoryList.slice(0, 20))); } catch (_) {}
-  renderHistory();
-}
-
-function loadHistoryFromStorage() {
-  try {
-    const s = localStorage.getItem('cosmic_sessions');
-    if (s) chatHistoryList = JSON.parse(s);
-  } catch (_) {}
-  renderHistory();
-}
-
-function renderHistory() {
-  chatHistory.innerHTML = '';
-  chatHistoryList.forEach((s, idx) => {
-    const item = document.createElement('div');
-    item.className = 'history-item';
-    item.innerHTML = `<span>${escapeHtml(s.title)}</span><button class="history-item-del" title="Delete conversation">&times;</button>`;
-    
-    item.querySelector('.history-item-del').onclick = (e) => {
-      e.stopPropagation();
-      chatHistoryList.splice(idx, 1);
-      try { localStorage.setItem('cosmic_sessions', JSON.stringify(chatHistoryList)); } catch (_) {}
-      renderHistory();
-    };
-
-    item.onclick = () => {
-      currentHistory = [...s.history];
-      welcomeEl.classList.add('hidden');
-      // Clear message rows
-      messagesEl.querySelectorAll('.message-row').forEach(r => r.remove());
-      currentHistory.forEach(m => appendMessage(m.role === 'user' ? 'user' : 'ai', m.content));
-      closeSidebar();
-    };
-    chatHistory.appendChild(item);
-  });
-}
-
-// New Chat & Clear Chat Handlers
-function startNewChat() {
-  currentHistory = [];
-  messagesEl.querySelectorAll('.message-row').forEach(r => r.remove());
-  welcomeEl.classList.remove('hidden');
-  messageInput.value = '';
-  messageInput.style.height = 'auto';
-  updateSendBtn();
-  closeSidebar();
-  showToast('Started new chat');
-}
-
-function clearChat() {
-  currentHistory = [];
-  messagesEl.querySelectorAll('.message-row').forEach(r => r.remove());
-  welcomeEl.classList.remove('hidden');
-  messageInput.value = '';
-  messageInput.style.height = 'auto';
-  updateSendBtn();
-  showToast('Chat cleared');
-}
-
-// Event Listeners
+// Events
 function setupEvents() {
   enhancerToggleBtn.onclick = toggleEnhancer;
-
-  document.getElementById('viewSplitBtn').onclick = () => setView('split');
-  document.getElementById('viewChatBtn').onclick = () => setView('chat');
-
+  $('viewSplitBtn').onclick = () => setView('split');
+  $('viewChatBtn').onclick = () => setView('chat');
   modeCodeBtn.onclick = () => setMode('code');
   modePreviewBtn.onclick = () => { runPreview(); setMode('preview'); };
   runPreviewBtn.onclick = runPreview;
-  copyEditorCodeBtn.onclick = (e) => copyText(codeTextarea.value, e.currentTarget);
+  copyEditorCodeBtn.onclick = e => copyText(codeTextarea.value, e.currentTarget);
   clearEditorCodeBtn.onclick = clearEditorCode;
-
-  // Workspace Actions
   if (newFileBtn) newFileBtn.onclick = createNewFile;
   if (resetFilesBtn) resetFilesBtn.onclick = resetWorkspaceFiles;
-
-  // Settings Actions
   if (openSettingsBtn) openSettingsBtn.onclick = openSettingsModal;
   if (sidebarSettingsBtn) sidebarSettingsBtn.onclick = () => { openSettingsModal(); closeSidebar(); };
   if (settingsCloseBtn) settingsCloseBtn.onclick = closeSettingsModal;
   if (settingsSaveBtn) settingsSaveBtn.onclick = saveSettings;
   if (settingsResetBtn) settingsResetBtn.onclick = resetSettingsToDefaults;
-  if (settingsModalOverlay) {
-    settingsModalOverlay.onclick = (e) => {
-      if (e.target === settingsModalOverlay) closeSettingsModal();
-    };
-  }
-  [settingGroqKey, settingGeminiKey, settingNvidiaKey].forEach(inp => {
-    if (inp) inp.oninput = updateKeyStatuses;
-  });
-
+  if (settingsModalOverlay) settingsModalOverlay.onclick = e => { if (e.target === settingsModalOverlay) closeSettingsModal(); };
+  [settingGroqKey, settingGeminiKey, settingNvidiaKey].forEach(inp => { if (inp) inp.oninput = updateKeyStatuses; });
   codeTextarea.oninput = () => { updateLines(); saveCurrentFileContent(); };
   codeTextarea.onscroll = () => { lineNumbers.scrollTop = codeTextarea.scrollTop; };
-  codeTextarea.onkeydown = (e) => {
+  codeTextarea.onkeydown = e => {
     if (e.key === 'Tab') {
       e.preventDefault();
       const s = codeTextarea.selectionStart;
       codeTextarea.value = codeTextarea.value.slice(0, s) + '  ' + codeTextarea.value.slice(codeTextarea.selectionEnd);
       codeTextarea.selectionStart = codeTextarea.selectionEnd = s + 2;
-      updateLines();
-      saveCurrentFileContent();
+      updateLines(); saveCurrentFileContent();
     }
   };
-
   sendBtn.onclick = sendMessage;
-  messageInput.onkeydown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-  };
-  messageInput.oninput = () => {
-    updateSendBtn();
-    messageInput.style.height = 'auto';
-    messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
-  };
-
+  messageInput.onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
+  messageInput.oninput = () => { updateSendBtn(); messageInput.style.height = 'auto'; messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px'; };
   clearChatBtn.onclick = clearChat;
   newChatBtn.onclick = startNewChat;
-
   deleteHistoryBtn.onclick = () => {
-    if (confirm('Clear all chat history?')) {
-      chatHistoryList = [];
-      try { localStorage.removeItem('cosmic_sessions'); } catch (_) {}
-      renderHistory();
-      startNewChat();
-      showToast('All chat history deleted');
-    }
+    if (!confirm('Clear all chat history and codespaces?')) return;
+    sessions = [];
+    try { ['cosmic_sessions','cosmic_active_session','cosmic_files'].forEach(k => localStorage.removeItem(k)); } catch (_) {}
+    createNewSession(true); showToast('All history cleared');
   };
-
-  hamburgerBtn.onclick = () => {
-    sidebar.classList.toggle('open');
-    sidebarOverlay.classList.toggle('visible');
-  };
+  hamburgerBtn.onclick = () => { sidebar.classList.toggle('open'); sidebarOverlay.classList.toggle('visible'); };
   sidebarOverlay.onclick = closeSidebar;
-
   document.querySelectorAll('.suggestion-chip').forEach(chip => {
-    chip.onclick = () => {
-      messageInput.value = chip.dataset.text;
-      updateSendBtn();
-      sendMessage();
-    };
+    chip.onclick = () => { messageInput.value = chip.dataset.text; updateSendBtn(); sendMessage(); };
   });
 }
 
-function updateSendBtn() {
-  sendBtn.disabled = !messageInput.value.trim() || isStreaming;
-}
-
-function closeSidebar() {
-  sidebar.classList.remove('open');
-  sidebarOverlay.classList.remove('visible');
-}
-
+function updateSendBtn() { sendBtn.disabled = !messageInput.value.trim() || isStreaming; }
+function closeSidebar() { sidebar.classList.remove('open'); sidebarOverlay.classList.remove('visible'); }
 function copyText(text, btn) {
   if (!text) return;
-  navigator.clipboard.writeText(text).then(() => {
-    const prev = btn.textContent;
-    btn.textContent = 'Copied';
-    setTimeout(() => btn.textContent = prev, 1500);
-  });
+  navigator.clipboard.writeText(text).then(() => { const p = btn.textContent; btn.textContent = 'Copied'; setTimeout(() => btn.textContent = p, 1500); });
 }
-
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
-
 function showToast(msg) {
   let t = document.querySelector('.toast');
-  if (!t) {
-    t = document.createElement('div');
-    t.className = 'toast';
-    document.body.appendChild(t);
-  }
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2000);
+  if (!t) { t = document.createElement('div'); t.className = 'toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000);
 }
 
-// Start application
 init();

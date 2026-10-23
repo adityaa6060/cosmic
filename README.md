@@ -1,67 +1,87 @@
-# Cosmic Studio IDE
+# Cosmic AI Studio
 
-A minimalist, high-performance web IDE and AI pair programmer built with foundational HTML, CSS, and Vanilla JavaScript.
-
-![License](https://img.shields.io/badge/license-MIT-black)
-![Theme](https://img.shields.io/badge/theme-minimalist%20monochrome-black)
+A lightweight, in-browser AI coding assistant and live code editor. No installation needed — just open `index.html` in any modern browser and start building.
 
 ---
 
-## Features
+## What it does
 
-- **Triple AI Agent Support**:
-  - **Groq Cloud AI**: Ultra-fast streaming inference powered by `openai/gpt-oss-120b` and Llama models.
-  - **Google Gemini**: Intelligent reasoning powered by Gemini 2.0 Flash.
-  - **NVIDIA NIM**: Accelerated enterprise open models like Llama 3.3 70B.
-  - Switch between agents directly in the chat bar anytime.
-
-- **✨ Groq Prompt Enhancer**:
-  - Located in the topbar header.
-  - Analyzes and transforms casual prompts into high-level, production-grade engineering specifications before sending.
-  - Explicitly informs the user at the beginning of the response about the enhanced prompt used.
-
-- **Integrated Code Workspace**:
-  - Multi-tab file editor (`index.html`, `style.css`, `script.js`, plus custom files).
-  - Synchronized line numbers and tab indentation support.
-  - Persistent code storage using `localStorage`.
-
-- **Live In-Browser Preview**:
-  - 1-click **Run Preview** to test your HTML, CSS, and JavaScript in an isolated sandbox.
-  - Toggle between **Split View**, **Editor Only**, and **AI Agent Only**.
-
-- **Apply AI Code Directly**:
-  - Code blocks generated in chat include an **Apply to Editor** button that instantly updates your workspace files.
-
-- **Voice Input & Image Generation**:
-  - Built-in speech recognition for hands-free prompting.
-  - AI image generation with Stable Horde.
+**Cosmic AI Studio** is a simple web app that combines an AI chat with a code editor and live preview. You describe what you want to build, the AI writes the code, and it appears instantly in the editor and preview — all inside your browser.
 
 ---
 
-## Getting Started
+## Main Features
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/adityaa6060/cosmic.git
-   cd cosmic
-   ```
+### AI Chat with multiple models
+You can pick from four AI agents to help you write code:
+- **Groq (OpenAI OSS 120B)** — powerful, detailed responses
+- **Groq Fast (Qwen 27B)** — quicker, lighter responses
+- **Gemini 2.5 Flash** — Google's model
+- **NVIDIA (Llama 3.2 11B)** — NVIDIA-hosted open model
 
-2. Open `index.html` in any modern web browser or serve locally:
-   ```bash
-   # Using Python
-   python -m http.server 8000
+### Each chat has its own code workspace
+Every time you start a new chat, you get a fresh, empty codespace with three files: `index.html`, `style.css`, and `script.js`. When you switch between old chats in the sidebar, the editor restores that chat's code exactly as you left it.
 
-   # Using Node.js
-   npx serve .
-   ```
+### Code is written automatically
+When the AI responds with HTML, CSS, or JavaScript code blocks, the app automatically writes them into the correct files in the editor. No copy-pasting needed.
 
-3. Configure your API keys in the **API Keys & Settings** modal (accessible from the sidebar). Groq works immediately with the default configuration.
+### Live preview
+Click **Run Preview** to instantly see your code running in a sandboxed iframe inside the app. The preview combines all three files together.
+
+### Built-in code editor
+- Tabs for `index.html`, `style.css`, and `script.js`
+- Line numbers
+- Tab key indentation
+- You can also type or edit code directly — changes are saved automatically
+
+### Prompt Enhancer
+An optional toggle in the topbar. When turned on, your prompt is sent to Groq first, which rewrites it into a more detailed technical specification before passing it to the main AI agent.
+
+### Chat history
+All past chats are saved in your browser (localStorage). You can click any past chat in the sidebar to restore it, including its code.
 
 ---
 
-## Tech Stack
+## How to use
 
-- **HTML5**: Semantic, accessible markup.
-- **CSS3**: Custom minimalist black-and-white design system with zero framework overhead.
-- **JavaScript**: Pure, foundational Vanilla ES2022.
-- **APIs**: Groq Cloud, Google Generative AI, NVIDIA NIM, Stable Horde.
+1. Open `index.html` in a browser (or serve locally with `python -m http.server`)
+2. Your API keys are pre-loaded. You can update them anytime via **Settings**
+3. Type what you want in the chat box and press **Enter**
+4. The AI writes the code. The editor updates automatically
+5. Click **Run Preview** to see it live
+6. Click **+ New Chat** to start a fresh project with a clean codespace
+
+---
+
+## File structure
+
+```
+cosmic-ai/
+├── index.html      — App layout and UI
+├── style.css       — All styles
+├── script.js       — All logic (editor, chat, AI calls, sessions)
+├── logo.png        — App logo
+└── .env/
+    └── keys.json   — API keys (pre-configured, not committed to public repos)
+```
+
+---
+
+## Tech stack
+
+- **HTML5** — page structure
+- **CSS3** — styling, no frameworks
+- **Vanilla JavaScript** — all logic, no build tools or bundlers
+- **Groq API** — Groq Cloud models
+- **Google Generative AI API** — Gemini
+- **NVIDIA NIM API** — NVIDIA-hosted open models
+- **marked.js** — renders markdown in chat responses
+- **highlight.js** — syntax highlighting in code blocks
+
+---
+
+## Notes
+
+- Everything runs client-side. No backend, no server needed
+- Code and chat history are saved in browser localStorage
+- API keys are stored locally in your browser — they are never sent anywhere except directly to the respective AI provider
