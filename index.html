@@ -25,7 +25,13 @@
     </div>
 
     <div class="sidebar-section">
-      <div class="section-title">Workspace Files</div>
+      <div class="section-header-row">
+        <div class="section-title">Workspace Files</div>
+        <div class="section-actions">
+          <button class="section-action-btn" id="newFileBtn" title="Create new file">+ File</button>
+          <button class="section-action-btn" id="resetFilesBtn" title="Reset starter files">Reset</button>
+        </div>
+      </div>
       <div class="file-list" id="sidebarFileList"></div>
     </div>
 
@@ -35,6 +41,7 @@
     </div>
 
     <div class="sidebar-footer">
+      <button class="btn btn-outline w-full" id="sidebarSettingsBtn">API Keys & Settings</button>
       <button class="btn btn-outline w-full" id="deleteHistoryBtn">Clear History</button>
       <div class="user-info">
         <div class="avatar">A</div>
@@ -68,14 +75,14 @@
       <div class="topbar-center">
         <div class="view-switch">
           <button class="view-btn active" id="viewSplitBtn">Split</button>
-          <button class="view-btn" id="viewEditorBtn">Editor</button>
           <button class="view-btn" id="viewChatBtn">Chat</button>
         </div>
       </div>
 
       <div class="topbar-right">
         <button class="btn btn-primary" id="runPreviewBtn">Run Preview</button>
-        <button class="icon-btn" id="clearChatBtn" title="Clear current chat">Clear</button>
+        <button class="icon-btn" id="clearChatBtn" title="Clear chat messages">Clear Chat</button>
+        <button class="icon-btn" id="openSettingsBtn" title="API Keys & Settings">Settings</button>
       </div>
     </header>
 
@@ -90,6 +97,7 @@
             <button class="tab-mode-btn active" id="modeCodeBtn">Code</button>
             <button class="tab-mode-btn" id="modePreviewBtn">Preview</button>
             <button class="editor-action-btn" id="copyEditorCodeBtn">Copy</button>
+            <button class="editor-action-btn" id="clearEditorCodeBtn" title="Clear code editor">Clear Code</button>
           </div>
         </div>
 
@@ -133,7 +141,8 @@
               <span class="agent-label">Agent:</span>
               <select class="agent-select" id="agentSelect">
                 <option value="groq" selected>Groq (OpenAI-OSS 120B)</option>
-                <option value="gemini">Gemini (2.0 Flash)</option>
+                <option value="groq-fast">Groq Fast (Qwen 27B)</option>
+                <option value="gemini">Gemini (2.5 Flash)</option>
                 <option value="nvidia">NVIDIA (Llama 3.2 11B)</option>
               </select>
             </div>
@@ -151,6 +160,47 @@
     </div>
   </div>
 
-  <script src="script.js?v=5"></script>
+  <!-- API Keys Settings Modal -->
+  <div class="modal-overlay" id="settingsModalOverlay">
+    <div class="modal">
+      <h3 class="modal-title">API Keys Configuration</h3>
+      <p class="modal-sub">Credentials for Groq, Google Gemini, and NVIDIA. Saved locally in your browser.</p>
+
+      <div class="form-group">
+        <label class="form-label" for="settingGroqKey">
+          <span>Groq API Key</span>
+          <span class="form-status" id="statusGroqKey">Checking...</span>
+        </label>
+        <input type="password" id="settingGroqKey" class="form-input" placeholder="gsk_..." />
+        <span class="form-hint">Powers Groq Agent (OSS 120B / Qwen 27B) and Prompt Enhancer.</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="settingGeminiKey">
+          <span>Google Gemini API Key</span>
+          <span class="form-status" id="statusGeminiKey">Checking...</span>
+        </label>
+        <input type="password" id="settingGeminiKey" class="form-input" placeholder="AIzaSy... or AQ..." />
+        <span class="form-hint">Powers Gemini 2.5 Flash agent.</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="settingNvidiaKey">
+          <span>NVIDIA NIM API Key</span>
+          <span class="form-status" id="statusNvidiaKey">Checking...</span>
+        </label>
+        <input type="password" id="settingNvidiaKey" class="form-input" placeholder="nvapi-..." />
+        <span class="form-hint">Powers NVIDIA NIM Llama 3.2 agent.</span>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="settingsResetBtn">Restore Defaults</button>
+        <button class="btn btn-outline" id="settingsCloseBtn">Cancel</button>
+        <button class="btn btn-primary" id="settingsSaveBtn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js?v=6"></script>
 </body>
 </html>

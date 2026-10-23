@@ -1,14 +1,16 @@
 // ============================================================
 // COSMIC AI — MINIMALIST IDE & 3-AGENT SYSTEM
-// Concise Vanilla JavaScript (Groq, Gemini, NVIDIA)
+// Robust Vanilla JavaScript (Groq, Gemini, NVIDIA)
 // ============================================================
 
-// API Credentials (loaded from .env/keys.json)
-const KEYS = {
+// API Credentials (loaded from .env/keys.json or Settings)
+const DEFAULT_KEYS = {
   groq: '',
   gemini: '',
   nvidia: ''
 };
+
+const KEYS = { ...DEFAULT_KEYS };
 
 const SYSTEM_PROMPT = 'You are Cosmic AI, a software engineering assistant in a code IDE. Write clean, direct code with language markdown tags. Explain concisely without conversational filler.';
 
@@ -82,6 +84,26 @@ const sidebar = document.getElementById('sidebar');
 const sidebarOverlay = document.getElementById('sidebarOverlay');
 const workspaceGrid = document.getElementById('workspaceGrid');
 
+// Workspace Actions
+const newFileBtn = document.getElementById('newFileBtn');
+const resetFilesBtn = document.getElementById('resetFilesBtn');
+const clearEditorCodeBtn = document.getElementById('clearEditorCodeBtn');
+
+// Settings Elements
+const openSettingsBtn = document.getElementById('openSettingsBtn');
+const sidebarSettingsBtn = document.getElementById('sidebarSettingsBtn');
+const settingsModalOverlay = document.getElementById('settingsModalOverlay');
+const settingsCloseBtn = document.getElementById('settingsCloseBtn');
+const settingsSaveBtn = document.getElementById('settingsSaveBtn');
+const settingsResetBtn = document.getElementById('settingsResetBtn');
+const settingGroqKey = document.getElementById('settingGroqKey');
+const settingGeminiKey = document.getElementById('settingGeminiKey');
+const settingNvidiaKey = document.getElementById('settingNvidiaKey');
+const statusGroqKey = document.getElementById('statusGroqKey');
+const statusGeminiKey = document.getElementById('statusGeminiKey');
+const statusNvidiaKey = document.getElementById('statusNvidiaKey');
+
+// Editor Elements
 const editorTabs = document.getElementById('editorTabs');
 const sidebarFileList = document.getElementById('sidebarFileList');
 const chatHistory = document.getElementById('chatHistory');
@@ -96,24 +118,27 @@ const codeTextarea = document.getElementById('codeTextarea');
 const statusFilename = document.getElementById('statusFilename');
 const statusInfo = document.getElementById('statusInfo');
 
+// Chat Elements
 const messagesEl = document.getElementById('messages');
 const welcomeEl = document.getElementById('welcome');
 const messageInput = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
 
-// Marked setup
-if (typeof marked !== 'undefined') {
-  marked.setOptions({
-    breaks: true,
-    gfm: true,
-    highlight: (code, lang) => (typeof hljs !== 'undefined' && lang && hljs.getLanguage(lang))
-      ? hljs.highlight(code, { language: lang }).value
-      : (typeof hljs !== 'undefined' ? hljs.highlightAuto(code).value : code)
-  });
+// Safe Markdown Parsing
+function renderMarkdown(text) {
+  if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
+    try {
+      return marked.parse(text);
+    } catch (_) {
+      return escapeHtml(text);
+    }
+  }
+  return escapeHtml(text);
 }
 
-// Init
+// Init Application
 async function init() {
+  loadStoredKeys();
   await loadEnvKeys();
   loadFilesFromStorage();
   loadHistoryFromStorage();
@@ -123,22 +148,88 @@ async function init() {
   openFile(activeFile);
 }
 
+// Credentials Management
+function loadStoredKeys() {
+  try {
+    const s = localStorage.getItem('cosmic_keys');
+    if (s) {
+      const parsed = JSON.parse(s);
+      if (parsed.groq) KEYS.groq = parsed.groq;
+      if (parsed.gemini) KEYS.gemini = parsed.gemini;
+      if (parsed.nvidia) KEYS.nvidia = parsed.nvidia;
+    }
+  } catch (_) {}
+}
+
 async function loadEnvKeys() {
   try {
     const res = await fetch('.env/keys.json');
     if (res.ok) {
       const data = await res.json();
-      if (data.GROQ_API_KEY) KEYS.groq = data.GROQ_API_KEY;
-      if (data.GEMINI_API_KEY) KEYS.gemini = data.GEMINI_API_KEY;
-      if (data.NVIDIA_API_KEY) KEYS.nvidia = data.NVIDIA_API_KEY;
+      if (!localStorage.getItem('cosmic_keys')) {
+        if (data.GROQ_API_KEY) KEYS.groq = data.GROQ_API_KEY;
+        if (data.GEMINI_API_KEY) KEYS.gemini = data.GEMINI_API_KEY;
+        if (data.NVIDIA_API_KEY) KEYS.nvidia = data.NVIDIA_API_KEY;
+        try { localStorage.setItem('cosmic_keys', JSON.stringify(KEYS)); } catch (_) {}
+      }
     }
   } catch (_) {}
 }
 
+function openSettingsModal() {
+  settingGroqKey.value = KEYS.groq || '';
+  settingGeminiKey.value = KEYS.gemini || '';
+  settingNvidiaKey.value = KEYS.nvidia || '';
+  updateKeyStatuses();
+  settingsModalOverlay.classList.add('show');
+}
+
+function closeSettingsModal() {
+  settingsModalOverlay.classList.remove('show');
+}
+
+function updateKeyStatuses() {
+  if (statusGroqKey) {
+    statusGroqKey.textContent = settingGroqKey.value.trim() ? 'Configured' : 'Missing';
+    statusGroqKey.className = `form-status ${settingGroqKey.value.trim() ? 'ok' : 'missing'}`;
+  }
+  if (statusGeminiKey) {
+    statusGeminiKey.textContent = settingGeminiKey.value.trim() ? 'Configured' : 'Missing';
+    statusGeminiKey.className = `form-status ${settingGeminiKey.value.trim() ? 'ok' : 'missing'}`;
+  }
+  if (statusNvidiaKey) {
+    statusNvidiaKey.textContent = settingNvidiaKey.value.trim() ? 'Configured' : 'Missing';
+    statusNvidiaKey.className = `form-status ${settingNvidiaKey.value.trim() ? 'ok' : 'missing'}`;
+  }
+}
+
+function saveSettings() {
+  KEYS.groq = settingGroqKey.value.trim();
+  KEYS.gemini = settingGeminiKey.value.trim();
+  KEYS.nvidia = settingNvidiaKey.value.trim();
+  try {
+    localStorage.setItem('cosmic_keys', JSON.stringify(KEYS));
+  } catch (_) {}
+  closeSettingsModal();
+  showToast('API credentials saved');
+}
+
+function resetSettingsToDefaults() {
+  settingGroqKey.value = DEFAULT_KEYS.groq;
+  settingGeminiKey.value = DEFAULT_KEYS.gemini;
+  settingNvidiaKey.value = DEFAULT_KEYS.nvidia;
+  updateKeyStatuses();
+  showToast('Default credentials restored in form');
+}
+
+// Workspace File Operations
 function loadFilesFromStorage() {
   try {
     const s = localStorage.getItem('cosmic_files');
-    if (s) files = JSON.parse(s);
+    if (s) {
+      const parsed = JSON.parse(s);
+      if (Object.keys(parsed).length > 0) files = parsed;
+    }
   } catch (_) {}
 }
 
@@ -146,7 +237,6 @@ function saveFilesToStorage() {
   try { localStorage.setItem('cosmic_files', JSON.stringify(files)); } catch (_) {}
 }
 
-// Workspace File Operations
 function renderFileTabs() {
   editorTabs.innerHTML = '';
   Object.keys(files).forEach(name => {
@@ -160,16 +250,42 @@ function renderFileTabs() {
 
 function renderSidebarFiles() {
   sidebarFileList.innerHTML = '';
-  Object.keys(files).forEach(name => {
+  const fileNames = Object.keys(files);
+  fileNames.forEach(name => {
     const item = document.createElement('div');
     item.className = `file-item${name === activeFile ? ' active' : ''}`;
-    item.textContent = name;
-    item.onclick = () => { saveCurrentFileContent(); openFile(name); setView('split'); closeSidebar(); };
+    
+    const label = document.createElement('span');
+    label.textContent = name;
+    item.appendChild(label);
+
+    // Delete button for custom files (or if there are multiple files)
+    if (fileNames.length > 1 && !['index.html', 'style.css', 'script.js'].includes(name)) {
+      const delBtn = document.createElement('button');
+      delBtn.className = 'file-item-del';
+      delBtn.innerHTML = '&times;';
+      delBtn.title = `Delete ${name}`;
+      delBtn.onclick = (e) => {
+        e.stopPropagation();
+        deleteFile(name);
+      };
+      item.appendChild(delBtn);
+    }
+
+    item.onclick = () => {
+      saveCurrentFileContent();
+      openFile(name);
+      setView('split');
+      closeSidebar();
+    };
     sidebarFileList.appendChild(item);
   });
 }
 
 function openFile(name) {
+  if (!files[name] && files[name] !== '') {
+    name = Object.keys(files)[0] || 'index.html';
+  }
   activeFile = name;
   codeTextarea.value = files[name] || '';
   statusFilename.textContent = name;
@@ -191,9 +307,59 @@ function updateLines() {
   statusInfo.textContent = `Lines: ${count} | UTF-8`;
 }
 
+function createNewFile() {
+  const rawName = prompt('Enter new file name (e.g., utils.js, component.html):');
+  if (!rawName) return;
+  const fileName = rawName.trim();
+  if (!fileName) return;
+
+  if (files[fileName] !== undefined) {
+    saveCurrentFileContent();
+    openFile(fileName);
+    showToast(`Switched to existing file: ${fileName}`);
+    return;
+  }
+
+  saveCurrentFileContent();
+  files[fileName] = '';
+  saveFilesToStorage();
+  openFile(fileName);
+  showToast(`Created ${fileName}`);
+}
+
+function deleteFile(name) {
+  if (!confirm(`Delete ${name}?`)) return;
+  delete files[name];
+  saveFilesToStorage();
+  if (activeFile === name) {
+    activeFile = Object.keys(files)[0] || 'index.html';
+  }
+  openFile(activeFile);
+  showToast(`Deleted ${name}`);
+}
+
+function resetWorkspaceFiles() {
+  if (!confirm('Reset all files (index.html, style.css, script.js) to clean starter templates?')) return;
+  files = { ...DEFAULT_FILES };
+  saveFilesToStorage();
+  openFile('index.html');
+  showToast('Workspace reset to starter project');
+}
+
+function clearEditorCode() {
+  if (!confirm(`Clear all code in ${activeFile}?`)) return;
+  codeTextarea.value = '';
+  saveCurrentFileContent();
+  updateLines();
+  showToast(`Cleared ${activeFile}`);
+}
+
 function runPreview() {
   saveCurrentFileContent();
-  const bundle = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${files['style.css'] || ''}</style></head><body>${(files['index.html'] || '').replace(/<link[^>]*>/gi, '').replace(/<script\s+src="[^"]*"[^>]*><\/script>/gi, '')}<script>${files['script.js'] || ''}<\/script></body></html>`;
+  const htmlContent = (files['index.html'] || '')
+    .replace(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi, '')
+    .replace(/<script\s+src=["'][^"']*["'][^>]*><\/script>/gi, '');
+  const bundle = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${files['style.css'] || ''}</style></head><body>${htmlContent}<script>${files['script.js'] || ''}<\/script></body></html>`;
   previewIframe.srcdoc = bundle;
   setMode('preview');
   if (workspaceGrid.classList.contains('mode-chat')) setView('split');
@@ -208,12 +374,12 @@ function setMode(mode) {
 }
 
 function setView(view) {
-  document.getElementById('viewSplitBtn').classList.toggle('active', view === 'split');
-  document.getElementById('viewEditorBtn').classList.toggle('active', view === 'editor');
-  document.getElementById('viewChatBtn').classList.toggle('active', view === 'chat');
+  const splitBtn = document.getElementById('viewSplitBtn');
+  const chatBtn = document.getElementById('viewChatBtn');
+  if (splitBtn) splitBtn.classList.toggle('active', view === 'split');
+  if (chatBtn) chatBtn.classList.toggle('active', view === 'chat');
 
   workspaceGrid.classList.remove('mode-editor', 'mode-chat');
-  if (view === 'editor') workspaceGrid.classList.add('mode-editor');
   if (view === 'chat') workspaceGrid.classList.add('mode-chat');
 }
 
@@ -228,38 +394,69 @@ function toggleEnhancer() {
 }
 
 async function enhancePrompt(promptText) {
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${KEYS.groq}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'openai/gpt-oss-120b',
-      temperature: 0.5,
-      max_tokens: 500,
-      messages: [
-        { role: 'system', content: 'You are an expert prompt engineer. Expand the user prompt into a precise, high-level technical engineering specification for an AI developer. Return ONLY the enhanced prompt.' },
-        { role: 'user', content: promptText }
-      ]
-    })
-  });
-  if (!res.ok) return promptText;
-  const d = await res.json();
-  return d.choices?.[0]?.message?.content?.trim() || promptText;
+  if (!KEYS.groq) return promptText;
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${KEYS.groq}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'qwen/qwen3.8-27b',
+        temperature: 0.5,
+        max_tokens: 500,
+        messages: [
+          { role: 'system', content: 'You are an expert prompt engineer. Expand the user prompt into a concise, high-level technical engineering specification for an AI developer. Return ONLY the enhanced prompt.' },
+          { role: 'user', content: promptText }
+        ]
+      })
+    });
+    if (!res.ok) return promptText;
+    const d = await res.json();
+    return d.choices?.[0]?.message?.content?.trim() || promptText;
+  } catch (_) {
+    return promptText;
+  }
 }
 
 // Agent Calls
-async function callAgent(agent, history, onChunk) {
+function getAgentName(agent) {
+  if (agent === 'gemini') return 'Gemini';
+  if (agent === 'groq-fast') return 'Groq Fast';
+  if (agent === 'nvidia') return 'NVIDIA';
+  return 'Groq';
+}
+
+async function callAgent(agent, history, onChunk, onReasoning) {
   if (agent === 'gemini') {
-    // Google Gemini 2.0 Flash
+    // Google Gemini 2.5 Flash
+    if (!KEYS.gemini) {
+      openSettingsModal();
+      throw new Error('Gemini API Key missing. Please configure it in Settings.');
+    }
     const contents = history.map(m => ({
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.content }]
     }));
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${KEYS.gemini}`, {
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${KEYS.gemini}`;
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents, systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] } })
+      body: JSON.stringify({
+        contents,
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] }
+      })
     });
-    if (!res.ok) throw new Error(`Gemini error (${res.status})`);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      let msg = `Gemini error (${res.status})`;
+      try {
+        const j = JSON.parse(errText);
+        if (j.error?.message) msg = j.error.message;
+      } catch (_) {}
+      throw new Error(msg);
+    }
+
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let full = '';
@@ -272,15 +469,24 @@ async function callAgent(agent, history, onChunk) {
         if (!data) continue;
         try {
           const parsed = JSON.parse(data);
-          const chunk = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (chunk) { full += chunk; onChunk(full); }
+          const parts = parsed.candidates?.[0]?.content?.parts || [];
+          for (const p of parts) {
+            if (p.text) {
+              full += p.text;
+              onChunk(full);
+            }
+          }
         } catch (_) {}
       }
     }
     return full;
 
   } else if (agent === 'nvidia') {
-    // NVIDIA NIM (Meta Llama 3.2 11B Vision)
+    // NVIDIA NIM (Meta Llama 3.2 11B Vision Instruct)
+    if (!KEYS.nvidia) {
+      openSettingsModal();
+      throw new Error('NVIDIA API Key missing. Please configure it in Settings.');
+    }
     const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${KEYS.nvidia}`, 'Content-Type': 'application/json' },
@@ -291,30 +497,82 @@ async function callAgent(agent, history, onChunk) {
         messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history]
       })
     });
-    if (!res.ok) throw new Error(`NVIDIA error (${res.status})`);
-    return await streamOpenAIResponse(res, onChunk);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      let msg = `NVIDIA error (${res.status})`;
+      try {
+        const j = JSON.parse(errText);
+        if (j.detail) msg = j.detail;
+        else if (j.title) msg = j.title;
+      } catch (_) {}
+      throw new Error(msg);
+    }
+    return await streamOpenAIResponse(res, onChunk, onReasoning);
+
+  } else if (agent === 'groq-fast') {
+    // Groq Cloud (Qwen 2.5 27B - Instant code responses)
+    if (!KEYS.groq) {
+      openSettingsModal();
+      throw new Error('Groq API Key missing. Please configure it in Settings.');
+    }
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${KEYS.groq}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'qwen/qwen3.8-27b',
+        stream: true,
+        max_tokens: 2000,
+        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history]
+      })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      let msg = `Groq error (${res.status})`;
+      try {
+        const j = JSON.parse(errText);
+        if (j.error?.message) msg = j.error.message;
+      } catch (_) {}
+      throw new Error(msg);
+    }
+    return await streamOpenAIResponse(res, onChunk, onReasoning);
 
   } else {
-    // Groq Cloud (OpenAI OSS 120B)
+    // Groq Cloud (OpenAI OSS 120B with Deep Reasoning)
+    if (!KEYS.groq) {
+      openSettingsModal();
+      throw new Error('Groq API Key missing. Please configure it in Settings.');
+    }
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${KEYS.groq}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'openai/gpt-oss-120b',
         stream: true,
-        max_tokens: 1500,
+        max_tokens: 2500,
         messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history]
       })
     });
-    if (!res.ok) throw new Error(`Groq error (${res.status})`);
-    return await streamOpenAIResponse(res, onChunk);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      let msg = `Groq error (${res.status})`;
+      try {
+        const j = JSON.parse(errText);
+        if (j.error?.message) msg = j.error.message;
+      } catch (_) {}
+      throw new Error(msg);
+    }
+    return await streamOpenAIResponse(res, onChunk, onReasoning);
   }
 }
 
-async function streamOpenAIResponse(res, onChunk) {
+async function streamOpenAIResponse(res, onChunk, onReasoning) {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let full = '';
+  let reasoning = '';
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -324,8 +582,16 @@ async function streamOpenAIResponse(res, onChunk) {
       if (data === '[DONE]' || !data) continue;
       try {
         const parsed = JSON.parse(data);
-        const token = parsed.choices?.[0]?.delta?.content;
-        if (token) { full += token; onChunk(full); }
+        const delta = parsed.choices?.[0]?.delta;
+        if (!delta) continue;
+        if (delta.reasoning && onReasoning) {
+          reasoning += delta.reasoning;
+          onReasoning(reasoning);
+        }
+        if (delta.content) {
+          full += delta.content;
+          onChunk(full);
+        }
       } catch (_) {}
     }
   }
@@ -339,6 +605,7 @@ async function sendMessage() {
 
   welcomeEl.classList.add('hidden');
   messageInput.value = '';
+  messageInput.style.height = 'auto';
   updateSendBtn();
 
   appendMessage('user', raw);
@@ -358,7 +625,7 @@ async function sendMessage() {
 
   currentHistory.push({ role: 'user', content: promptToSend });
   const agent = agentSelect.value;
-  const typing = appendTyping(`${agent.toUpperCase()} is writing...`);
+  const typing = appendTyping(`${getAgentName(agent)} is writing...`);
   isStreaming = true;
 
   try {
@@ -367,22 +634,48 @@ async function sendMessage() {
     typing.remove();
 
     let fullRes = '';
-    await callAgent(agent, currentHistory, (chunk) => {
-      fullRes = chunk;
-      bubble.innerHTML = marked.parse(enhancedPrefix + fullRes);
-      setupCodeBlocks(bubble);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    });
+    let reasoningText = '';
+
+    await callAgent(
+      agent,
+      currentHistory,
+      (chunk) => {
+        fullRes = chunk;
+        renderAiBubble(bubble, enhancedPrefix + fullRes, reasoningText);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      },
+      (rChunk) => {
+        reasoningText = rChunk;
+        renderAiBubble(bubble, enhancedPrefix + fullRes, reasoningText);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+    );
 
     currentHistory.push({ role: 'assistant', content: fullRes });
     saveSession();
   } catch (err) {
     typing.remove();
-    appendMessage('ai', `Error: ${err.message}`);
+    appendMessage('ai', `**Agent Error (${getAgentName(agent)}):** ${err.message}\n\n*Check your API credentials in Settings if needed.*`);
   }
 
   isStreaming = false;
   updateSendBtn();
+}
+
+function renderAiBubble(bubble, markdownText, reasoningText) {
+  let html = '';
+  if (reasoningText) {
+    html += `<div class="thinking-box">
+      <div class="thinking-header" onclick="this.nextElementSibling.classList.toggle('hidden')">
+        <span>Thinking (${reasoningText.length} chars)</span>
+        <span style="font-size:10px;">toggle</span>
+      </div>
+      <div class="thinking-content">${escapeHtml(reasoningText)}</div>
+    </div>`;
+  }
+  html += renderMarkdown(markdownText);
+  bubble.innerHTML = html;
+  setupCodeBlocks(bubble);
 }
 
 // Message Rendering
@@ -391,7 +684,7 @@ function appendMessage(role, text) {
   row.className = `message-row ${role}`;
   row.innerHTML = `
     ${role === 'ai' ? '<div class="msg-avatar">AI</div>' : ''}
-    <div class="msg-content"><div class="bubble">${marked.parse(text)}</div></div>`;
+    <div class="msg-content"><div class="bubble">${renderMarkdown(text)}</div></div>`;
   setupCodeBlocks(row);
   messagesEl.appendChild(row);
   messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -401,8 +694,9 @@ function appendMessage(role, text) {
 function createAiRow(agent) {
   const row = document.createElement('div');
   row.className = 'message-row ai';
+  const initial = agent === 'gemini' ? 'G' : (agent === 'nvidia' ? 'N' : 'Q');
   row.innerHTML = `
-    <div class="msg-avatar">${agent === 'gemini' ? 'G' : (agent === 'nvidia' ? 'N' : 'Q')}</div>
+    <div class="msg-avatar">${initial}</div>
     <div class="msg-content"><div class="bubble"></div></div>`;
   messagesEl.appendChild(row);
   messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -425,7 +719,7 @@ function setupCodeBlocks(container) {
 
     const code = pre.querySelector('code');
     if (!code) return;
-    hljs.highlightElement(code);
+    if (typeof hljs !== 'undefined') hljs.highlightElement(code);
 
     const lang = Array.from(code.classList).find(c => c.startsWith('language-'))?.replace('language-', '') || 'code';
 
@@ -446,6 +740,7 @@ function setupCodeBlocks(container) {
       if (lang.includes('html')) target = 'index.html';
       else if (lang.includes('css')) target = 'style.css';
       else if (lang.includes('js')) target = 'script.js';
+      
       files[target] = code.innerText;
       saveFilesToStorage();
       openFile(target);
@@ -481,17 +776,20 @@ function renderHistory() {
   chatHistoryList.forEach((s, idx) => {
     const item = document.createElement('div');
     item.className = 'history-item';
-    item.innerHTML = `<span>${s.title}</span><button class="history-item-del">&times;</button>`;
+    item.innerHTML = `<span>${escapeHtml(s.title)}</span><button class="history-item-del" title="Delete conversation">&times;</button>`;
+    
     item.querySelector('.history-item-del').onclick = (e) => {
       e.stopPropagation();
       chatHistoryList.splice(idx, 1);
       try { localStorage.setItem('cosmic_sessions', JSON.stringify(chatHistoryList)); } catch (_) {}
       renderHistory();
     };
+
     item.onclick = () => {
       currentHistory = [...s.history];
       welcomeEl.classList.add('hidden');
-      messagesEl.innerHTML = '';
+      // Clear message rows
+      messagesEl.querySelectorAll('.message-row').forEach(r => r.remove());
       currentHistory.forEach(m => appendMessage(m.role === 'user' ? 'user' : 'ai', m.content));
       closeSidebar();
     };
@@ -499,26 +797,59 @@ function renderHistory() {
   });
 }
 
+// New Chat & Clear Chat Handlers
 function startNewChat() {
   currentHistory = [];
-  messagesEl.innerHTML = '';
-  messagesEl.appendChild(welcomeEl);
+  messagesEl.querySelectorAll('.message-row').forEach(r => r.remove());
   welcomeEl.classList.remove('hidden');
+  messageInput.value = '';
+  messageInput.style.height = 'auto';
+  updateSendBtn();
   closeSidebar();
+  showToast('Started new chat');
 }
 
-// Events
+function clearChat() {
+  currentHistory = [];
+  messagesEl.querySelectorAll('.message-row').forEach(r => r.remove());
+  welcomeEl.classList.remove('hidden');
+  messageInput.value = '';
+  messageInput.style.height = 'auto';
+  updateSendBtn();
+  showToast('Chat cleared');
+}
+
+// Event Listeners
 function setupEvents() {
   enhancerToggleBtn.onclick = toggleEnhancer;
 
   document.getElementById('viewSplitBtn').onclick = () => setView('split');
-  document.getElementById('viewEditorBtn').onclick = () => setView('editor');
   document.getElementById('viewChatBtn').onclick = () => setView('chat');
 
   modeCodeBtn.onclick = () => setMode('code');
   modePreviewBtn.onclick = () => { runPreview(); setMode('preview'); };
   runPreviewBtn.onclick = runPreview;
   copyEditorCodeBtn.onclick = (e) => copyText(codeTextarea.value, e.currentTarget);
+  clearEditorCodeBtn.onclick = clearEditorCode;
+
+  // Workspace Actions
+  if (newFileBtn) newFileBtn.onclick = createNewFile;
+  if (resetFilesBtn) resetFilesBtn.onclick = resetWorkspaceFiles;
+
+  // Settings Actions
+  if (openSettingsBtn) openSettingsBtn.onclick = openSettingsModal;
+  if (sidebarSettingsBtn) sidebarSettingsBtn.onclick = () => { openSettingsModal(); closeSidebar(); };
+  if (settingsCloseBtn) settingsCloseBtn.onclick = closeSettingsModal;
+  if (settingsSaveBtn) settingsSaveBtn.onclick = saveSettings;
+  if (settingsResetBtn) settingsResetBtn.onclick = resetSettingsToDefaults;
+  if (settingsModalOverlay) {
+    settingsModalOverlay.onclick = (e) => {
+      if (e.target === settingsModalOverlay) closeSettingsModal();
+    };
+  }
+  [settingGroqKey, settingGeminiKey, settingNvidiaKey].forEach(inp => {
+    if (inp) inp.oninput = updateKeyStatuses;
+  });
 
   codeTextarea.oninput = () => { updateLines(); saveCurrentFileContent(); };
   codeTextarea.onscroll = () => { lineNumbers.scrollTop = codeTextarea.scrollTop; };
@@ -543,14 +874,7 @@ function setupEvents() {
     messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
   };
 
-  clearChatBtn.onclick = () => {
-    currentHistory = [];
-    messagesEl.innerHTML = '';
-    messagesEl.appendChild(welcomeEl);
-    welcomeEl.classList.remove('hidden');
-    showToast('Chat cleared');
-  };
-
+  clearChatBtn.onclick = clearChat;
   newChatBtn.onclick = startNewChat;
 
   deleteHistoryBtn.onclick = () => {
@@ -559,7 +883,7 @@ function setupEvents() {
       try { localStorage.removeItem('cosmic_sessions'); } catch (_) {}
       renderHistory();
       startNewChat();
-      showToast('History deleted');
+      showToast('All chat history deleted');
     }
   };
 
@@ -596,6 +920,15 @@ function copyText(text, btn) {
   });
 }
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function showToast(msg) {
   let t = document.querySelector('.toast');
   if (!t) {
@@ -608,4 +941,5 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2000);
 }
 
+// Start application
 init();
