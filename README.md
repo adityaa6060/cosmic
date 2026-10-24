@@ -1,87 +1,126 @@
-# Cosmic AI Studio
+# Cosmic AI Studio — Multi-Agent In-Browser IDE & Prompt Engineering Platform
 
-A lightweight, in-browser AI coding assistant and live code editor. No installation needed — just open `index.html` in any modern browser and start building.
+![Cosmic AI](logo.png)
 
----
-
-## What it does
-
-**Cosmic AI Studio** is a simple web app that combines an AI chat with a code editor and live preview. You describe what you want to build, the AI writes the code, and it appears instantly in the editor and preview — all inside your browser.
+**Cosmic AI Studio** is a serverless, client-side web IDE and multi-agent AI development environment. Designed for **Prompt Engineering and AI-assisted Software Development**, Cosmic AI integrates multiple state-of-the-art Large Language Models (LLMs) from different AI providers (Groq, Google Gemini, and NVIDIA NIM) into an unified, interactive coding workspace with real-time streaming, dynamic in-context state injection, two-stage meta-prompt chaining, and an instant sandboxed live preview.
 
 ---
 
-## Main Features
+## 🌟 Key Prompt Engineering Innovations
 
-### AI Chat with multiple models
-You can pick from four AI agents to help you write code:
-- **Groq (OpenAI OSS 120B)** — powerful, detailed responses
-- **Groq Fast (Qwen 27B)** — quicker, lighter responses
-- **Gemini 2.5 Flash** — Google's model
-- **NVIDIA (Llama 3.2 11B)** — NVIDIA-hosted open model
+Cosmic AI Studio is built from the ground up to showcase modern prompt engineering methodologies and agentic orchestration patterns:
 
-### Each chat has its own code workspace
-Every time you start a new chat, you get a fresh, empty codespace with three files: `index.html`, `style.css`, and `script.js`. When you switch between old chats in the sidebar, the editor restores that chat's code exactly as you left it.
+### 1. Dynamic In-Context State Injection (Codespace Grounding)
+Rather than operating on isolated prompts, Cosmic AI continuously grounds the language model by injecting the current codespace state into the system prompt at runtime.
+- Active files (`index.html`, `style.css`, `script.js`, and user-defined files) are concatenated with structured delimiters:
+  ```text
+  CURRENT CODESPACE:
+  --- Current index.html ---
+  [code]
+  --- Current style.css ---
+  [code]
+  --- Current script.js ---
+  [code]
+  Build upon these existing files.
+  ```
+- **Prompt Engineering Impact**: Mitigates hallucinations, allows zero-shot iterative refactoring, and ensures the AI respects existing function signatures, CSS classes, and DOM IDs without manual re-prompting.
 
-### Code is written automatically
-When the AI responds with HTML, CSS, or JavaScript code blocks, the app automatically writes them into the correct files in the editor. No copy-pasting needed.
+### 2. Two-Stage Meta-Prompt Chaining (Prompt Enhancer)
+Cosmic AI features an optional **Prompt Enhancer** powered by Groq (`qwen/qwen3.8-27b`).
+- **Stage 1 (Meta-Prompting)**: Takes raw, ambiguous user input and expands it into an unambiguous, structured technical specification covering component layout, styling requirements, and event handlers.
+  > *System Prompt:* `"Expert prompt engineer. Expand the user prompt into a concise technical spec for a foundational vanilla web app. Return ONLY the enhanced prompt."*
+- **Stage 2 (Agent Execution)**: The enhanced prompt is piped directly to the selected coding agent, accompanied by the full session conversation history and current codespace state.
 
-### Live preview
-Click **Run Preview** to instantly see your code running in a sandboxed iframe inside the app. The preview combines all three files together.
+### 3. Delimiter-Based Structured Output Enforcement
+The system prompt enforces strict structural boundaries requiring models to output standard fenced markdown blocks (` ```html `, ` ```css `, ` ```javascript `).
+- A deterministic client-side regex streaming parser intercepts tokens in real-time, extracts code buffers, and routes them directly to their corresponding file models.
+- Eliminates manual copy-pasting and avoids conversational preamble cluttering the workspace.
 
-### Built-in code editor
-- Tabs for `index.html`, `style.css`, and `script.js`
-- Line numbers
-- Tab key indentation
-- You can also type or edit code directly — changes are saved automatically
-
-### Prompt Enhancer
-An optional toggle in the topbar. When turned on, your prompt is sent to Groq first, which rewrites it into a more detailed technical specification before passing it to the main AI agent.
-
-### Chat history
-All past chats are saved in your browser (localStorage). You can click any past chat in the sidebar to restore it, including its code.
-
----
-
-## How to use
-
-1. Open `index.html` in a browser (or serve locally with `python -m http.server`)
-2. Your API keys are pre-loaded. You can update them anytime via **Settings**
-3. Type what you want in the chat box and press **Enter**
-4. The AI writes the code. The editor updates automatically
-5. Click **Run Preview** to see it live
-6. Click **+ New Chat** to start a fresh project with a clean codespace
+### 4. Native Chain-of-Thought (CoT) & Reasoning Visualization
+For models outputting explicit reasoning tokens (`delta.reasoning`), Cosmic AI parses and presents intermediate thinking steps inside collapsible, real-time inspection accordions.
+- Allows students and researchers to observe the model's internal decomposition, planning, and self-correction before code synthesis begins.
 
 ---
 
-## File structure
+## 🤖 Multi-Agent LLM Architecture
+
+Cosmic AI Studio provides out-of-the-box support for heterogeneous LLM providers via a unified client-side streaming client:
+
+| Agent Label | Model Provider | Architecture / Model ID | Context / Tokens | Protocol & Streaming | Key Strengths |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Groq (OpenAI-OSS)** | Groq Cloud | `openai/gpt-oss-120b` | 3,500 max tokens | OpenAI SSE (`/v1/chat/completions`) | Ultra-fast LPU inference, deep architectural knowledge |
+| **Groq Fast** | Groq Cloud | `qwen/qwen3.8-27b` | 3,000 max tokens | OpenAI SSE (`/v1/chat/completions`) | Rapid iteration, lightweight generation, prompt enhancer |
+| **Gemini** | Google GenAI | `gemini-2.5-flash` | Adaptive | Google GenAI SSE (`streamGenerateContent`) | Advanced multimodal reasoning, system instruction support |
+| **NVIDIA NIM** | NVIDIA NIM | `meta/llama-3.2-11b-vision-instruct` | 2,500 max tokens | OpenAI-compatible SSE | Enterprise open weights, precision code synthesis |
+
+---
+
+## 🖥️ IDE & Runtime Features
+
+- **Instant Sandboxed Live Preview**: Executes HTML, CSS, and JavaScript in an isolated `iframe` with `sandbox="allow-scripts allow-modals"`.
+- **Multi-Session Codespace Manager**: Each chat thread maintains an independent codespace saved in browser `localStorage`. Switching chat sessions restores associated code files immediately.
+- **Dynamic File Management**: Create custom files (`utils.js`, `data.json`), reset workspaces, or delete files directly from the sidebar.
+- **Clean Minimalist Theme**: Monochromatic black-and-white visual identity with responsive split-screen and full-screen modes.
+- **In-Editor Controls**: Built-in line numbering, tab indentation (`Tab` key handling), one-click clipboard copying, and manual file editing.
+- **Local Privacy & Zero-Backend**: All API calls are made directly from the user's browser to the AI providers. API keys and code never touch intermediate proxy servers.
+
+---
+
+## 📁 Project Architecture & File Structure
 
 ```
 cosmic-ai/
-├── index.html      — App layout and UI
-├── style.css       — All styles
-├── script.js       — All logic (editor, chat, AI calls, sessions)
-├── logo.png        — App logo
+├── index.html         # Application layout, modals, sidebar, and editor DOM
+├── style.css          # Minimalist black & white responsive design system
+├── script.js          # Core engine (API clients, SSE streaming, state & sessions, parser)
+├── logo.png           # Cosmic AI visual branding
+├── README.md          # Comprehensive documentation and prompt engineering guide
 └── .env/
-    └── keys.json   — API keys (pre-configured, not committed to public repos)
+    └── keys.json      # Optional pre-configured API keys (gitignored)
 ```
 
 ---
 
-## Tech stack
+## ⚡ Quickstart & Setup
 
-- **HTML5** — page structure
-- **CSS3** — styling, no frameworks
-- **Vanilla JavaScript** — all logic, no build tools or bundlers
-- **Groq API** — Groq Cloud models
-- **Google Generative AI API** — Gemini
-- **NVIDIA NIM API** — NVIDIA-hosted open models
-- **marked.js** — renders markdown in chat responses
-- **highlight.js** — syntax highlighting in code blocks
+### 1. Launch the Studio
+Because Cosmic AI is 100% client-side, no build tools or package managers are required:
+```bash
+# Clone the repository
+git clone https://github.com/adityaa6060/cosmic.git
+
+# Serve via any static web server (e.g. Python)
+python -m http.server 8000
+```
+Open `http://localhost:8000` in your browser.
+
+### 2. Configure API Keys
+You can configure API keys in two ways:
+1. **Via UI**: Click **Settings** in the top bar or sidebar, enter your API keys (Groq, Gemini, NVIDIA NIM), and click **Save Changes**. Keys are persisted securely in your browser's `localStorage`.
+2. **Via `.env/keys.json`**: Place your keys in `.env/keys.json` (automatically loaded if served locally):
+   ```json
+   {
+     "GROQ_API_KEY": "gsk_...",
+     "GEMINI_API_KEY": "AIzaSy...",
+     "NVIDIA_API_KEY": "nvapi-..."
+   }
+   ```
 
 ---
 
-## Notes
+## 🛠️ Technology Stack
 
-- Everything runs client-side. No backend, no server needed
-- Code and chat history are saved in browser localStorage
-- API keys are stored locally in your browser — they are never sent anywhere except directly to the respective AI provider
+- **Frontend Core**: Vanilla HTML5, Semantic Elements, CSS3 Custom Properties (Variables)
+- **Logic & Execution**: Vanilla Modern JavaScript (ES6+), Event-driven Architecture
+- **Markdown & Highlighting**: [marked.js](https://github.com/markedjs/marked) for markdown rendering, [highlight.js](https://highlightjs.org/) for syntax highlighting
+- **Typography**: [Inter](https://fonts.google.com/specimen/Inter) and [JetBrains Mono](https://fonts.google.com/specimen/JetBrains+Mono) via Google Fonts
+- **AI Integrations**:
+  - Groq Cloud API (OpenAI-compatible streaming completions)
+  - Google Generative AI REST API (`v1beta`)
+  - NVIDIA NIM API (OpenAI-compatible inference endpoints)
+
+---
+
+## 📜 License
+
+MIT License. Developed for Prompt Engineering research and generative AI development.
