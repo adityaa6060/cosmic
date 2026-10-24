@@ -29,7 +29,8 @@ const settingGroqKey = $('settingGroqKey'), settingGeminiKey = $('settingGeminiK
 const statusGroqKey = $('statusGroqKey'), statusGeminiKey = $('statusGeminiKey'), statusNvidiaKey = $('statusNvidiaKey');
 const editorTabs = $('editorTabs'), sidebarFileList = $('sidebarFileList'), chatHistory = $('chatHistory');
 const modeCodeBtn = $('modeCodeBtn'), modePreviewBtn = $('modePreviewBtn'), copyEditorCodeBtn = $('copyEditorCodeBtn');
-const editorCodeView = $('editorCodeView'), editorPreviewView = $('editorPreviewView'), previewIframe = $('previewIframe');
+const editorCodeView = $('editorCodeView'), editorPreviewView = $('editorPreviewView');
+let previewIframe = $('previewIframe');
 const lineNumbers = $('lineNumbers'), codeTextarea = $('codeTextarea'), statusFilename = $('statusFilename'), statusInfo = $('statusInfo');
 const messagesEl = $('messages'), welcomeEl = $('welcome'), messageInput = $('messageInput'), sendBtn = $('sendBtn');
 
@@ -329,15 +330,29 @@ function clearEditorCode() {
 
 // Preview
 function updatePreviewIframe() {
+  const container = $('editorPreviewView');
+  if (!container) return;
   const html = (files['index.html'] || '')
     .replace(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi, '')
     .replace(/<script\s+src=["'][^"']*["'][^>]*><\/script>/gi, '');
-  previewIframe.srcdoc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${files['style.css'] || ''}</style></head><body>${html}<script>${files['script.js'] || ''}<\/script></body></html>`;
+  const doc = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${files['style.css'] || ''}</style></head><body>${html}<script>${files['script.js'] || ''}<\/script></body></html>`;
+
+  const newIframe = document.createElement('iframe');
+  newIframe.className = 'preview-iframe';
+  newIframe.id = 'previewIframe';
+  newIframe.sandbox = 'allow-scripts allow-modals';
+  newIframe.srcdoc = doc;
+
+  container.innerHTML = '';
+  container.appendChild(newIframe);
+  previewIframe = newIframe;
 }
 
 function runPreview() {
-  saveCurrentFileContent(); updatePreviewIframe(); setMode('preview');
+  saveCurrentFileContent();
   if (workspaceGrid.classList.contains('mode-chat')) setView('split');
+  setMode('preview');
+  updatePreviewIframe();
   showToast('Live preview updated');
 }
 
@@ -346,6 +361,7 @@ function setMode(mode) {
   modePreviewBtn.classList.toggle('active', mode === 'preview');
   editorCodeView.style.display = mode === 'code' ? 'flex' : 'none';
   editorPreviewView.style.display = mode === 'preview' ? 'flex' : 'none';
+  if (mode === 'preview') updatePreviewIframe();
 }
 
 function setView(view) {
@@ -571,7 +587,7 @@ function setupEvents() {
   $('viewSplitBtn').onclick = () => setView('split');
   $('viewChatBtn').onclick = () => setView('chat');
   modeCodeBtn.onclick = () => setMode('code');
-  modePreviewBtn.onclick = () => { runPreview(); setMode('preview'); };
+  modePreviewBtn.onclick = runPreview;
   runPreviewBtn.onclick = runPreview;
   copyEditorCodeBtn.onclick = e => copyText(codeTextarea.value, e.currentTarget);
   clearEditorCodeBtn.onclick = clearEditorCode;
