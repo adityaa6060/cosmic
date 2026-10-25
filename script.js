@@ -9,7 +9,7 @@ const AGENT_CFG = {
   groq:      { url: 'https://api.groq.com/openai/v1/chat/completions',       key: 'groq',   model: 'openai/gpt-oss-120b',                    tokens: 3500, type: 'openai', name: 'Groq' },
   'groq-fast':{ url: 'https://api.groq.com/openai/v1/chat/completions',      key: 'groq',   model: 'qwen/qwen3.8-27b',                       tokens: 3000, type: 'openai', name: 'Groq Fast' },
   nvidia:    { url: 'https://integrate.api.nvidia.com/v1/chat/completions',   key: 'nvidia', model: 'meta/llama-3.2-11b-vision-instruct',     tokens: 2500, type: 'openai', name: 'NVIDIA' },
-  gemini:    { url: null,                                                      key: 'gemini', model: 'gemini-2.5-flash',                      tokens: null, type: 'gemini', name: 'Gemini' }
+  gemini:    { url: null,                                                      key: 'gemini', model: 'gemini-3.6-flash',                      tokens: null, type: 'gemini', name: 'Gemini' }
 };
 
 let enhancerActive = false, isStreaming = false, activeFile = 'index.html';

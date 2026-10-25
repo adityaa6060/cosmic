@@ -8,7 +8,7 @@ A lightweight, serverless web IDE and multi-agent AI coding workspace. Build web
 
 ## What It Does
 
-- **Multi-Model AI Chat**: Switch between Groq (`gpt-oss-120b`, `qwen-27b`), Google Gemini (`gemini-2.5-flash`), and NVIDIA NIM (`llama-3.2-11b`) instantly.
+- **Multi-Model AI Chat**: Switch between Groq (`gpt-oss-120b`, `qwen-27b`), Google Gemini (`gemini-3.6-flash`), and NVIDIA NIM (`llama-3.2-11b`) instantly.
 - **Auto-Code Writing**: The AI writes directly into `index.html`, `style.css`, and `script.js` without manual copy-pasting.
 - **Instant Live Preview**: Run and interact with your web app side-by-side in a sandboxed preview.
 - **Prompt Enhancer**: Automatically turns brief ideas into detailed technical specs.
