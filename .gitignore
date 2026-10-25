@@ -3,6 +3,8 @@
 .env
 *.env
 .env.*
+keys.js
+*.keys.js
 
 # OS & Editor
 .DS_Store

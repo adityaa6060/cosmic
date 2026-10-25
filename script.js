@@ -58,9 +58,19 @@ Rules:
 async function init() {
   migrateStorage();
   loadStoredKeys();
+  loadWindowKeys();
   await loadEnvKeys();
   loadSessionsFromStorage();
   setupEvents();
+}
+
+function loadWindowKeys() {
+  if (typeof window !== 'undefined' && window.COSMIC_KEYS) {
+    if (window.COSMIC_KEYS.GROQ_API_KEY) KEYS.groq = window.COSMIC_KEYS.GROQ_API_KEY.trim();
+    if (window.COSMIC_KEYS.GEMINI_API_KEY) KEYS.gemini = window.COSMIC_KEYS.GEMINI_API_KEY.trim();
+    if (window.COSMIC_KEYS.NVIDIA_API_KEY) KEYS.nvidia = window.COSMIC_KEYS.NVIDIA_API_KEY.trim();
+    try { localStorage.setItem('cosmic_keys', JSON.stringify(KEYS)); } catch (_) {}
+  }
 }
 
 function migrateStorage() {
